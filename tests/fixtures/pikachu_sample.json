@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "id": "base1-25",
+      "name": "Pikachu",
+      "supertype": "Pokémon",
+      "subtypes": ["Basic"],
+      "hp": "60",
+      "types": ["Lightning"],
+      "number": "25",
+      "artist": "Mitsuhiro Arita",
+      "rarity": "Common",
+      "set": {
+        "id": "base1",
+        "name": "Base",
+        "series": "Base",
+        "printedTotal": 102,
+        "total": 102
+      },
+      "images": {
+        "small": "https://images.pokemontcg.io/base1/25.png",
+        "large": "https://images.pokemontcg.io/base1/25_hires.png"
+      },
+      "tcgplayer": {
+        "url": "https://prices.pokemontcg.io/tcgplayer/base1-25",
+        "updatedAt": "2023/12/01",
+        "prices": {
+          "normal": {
+            "low": 5.95,
+            "mid": 12.99,
+            "high": 25.00,
+            "market": 8.50,
+            "directLow": null
+          }
+        }
+      },
+      "cardmarket": {
+        "url": "https://prices.pokemontcg.io/cardmarket/base1-25",
+        "updatedAt": "2023/12/01",
+        "prices": {
+          "averageSellPrice": 7.25,
+          "lowPrice": 3.50,
+          "trendPrice": 8.00,
+          "avg30": 7.80
+        }
+      }
+    }
+  ]
+}

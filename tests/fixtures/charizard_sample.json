@@ -1,0 +1,57 @@
+{
+  "data": [
+    {
+      "id": "base1-4",
+      "name": "Charizard",
+      "supertype": "Pokémon",
+      "subtypes": ["Stage 2"],
+      "hp": "120",
+      "types": ["Fire"],
+      "number": "4",
+      "artist": "Mitsuhiro Arita",
+      "rarity": "Rare Holo",
+      "set": {
+        "id": "base1",
+        "name": "Base",
+        "series": "Base",
+        "printedTotal": 102,
+        "total": 102
+      },
+      "images": {
+        "small": "https://images.pokemontcg.io/base1/4.png",
+        "large": "https://images.pokemontcg.io/base1/4_hires.png"
+      },
+      "tcgplayer": {
+        "url": "https://prices.pokemontcg.io/tcgplayer/base1-4",
+        "updatedAt": "2023/12/01",
+        "prices": {
+          "holofoil": {
+            "low": 89.95,
+            "mid": 149.99,
+            "high": 399.99,
+            "market": 125.00,
+            "directLow": null
+          }
+        }
+      },
+      "cardmarket": {
+        "url": "https://prices.pokemontcg.io/cardmarket/base1-4",
+        "updatedAt": "2023/12/01",
+        "prices": {
+          "averageSellPrice": 110.50,
+          "lowPrice": 85.00,
+          "trendPrice": 120.00,
+          "germanProLow": 0,
+          "suggestedPrice": 0,
+          "reverseHoloSell": 0,
+          "reverseHoloLow": 0,
+          "reverseHoloTrend": 0,
+          "lowPriceExPlus": 85.00,
+          "avg1": 110.50,
+          "avg7": 115.00,
+          "avg30": 118.75
+        }
+      }
+    }
+  ]
+}
