@@ -1,0 +1,22 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Wire CLI with commands: `build-index`, `run` (one-pass), `scan`/`price` (batch). Visual matching primary.
+
+THINK
+`run` should: capture → warp → embed → ANN search → ORB re-rank → confidence → resolve → price → CSV append → beep → next.
+
+PLAN
+- `src/cli.py` (Typer):
+  - `build-index`: delegate to reference builder.
+  - `run`: loop with camera; implement minimal console prompts if confidence < threshold.
+  - `scan`: save warped image + timestamp to queue (SQLite scans).
+  - `price`: process NEW scans with small sleep (rate limit).
+
+APPLY
+Implement `src/cli.py` per plan, importing shared constants/types and writer/cache modules.
+
+TEST
+- `python -m src.cli --help` shows commands.
+- Dry-run (without camera) path import works; you may guard camera code under `if __name__ == "__main__":`.

@@ -1,0 +1,19 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Write fixed-schema CSV rows and maintain a minimal SQLite cache for idempotent pricing/card writes.
+
+THINK
+One row per card with exact header order. Cache to avoid redundant network calls. CSV should fsync after append.
+
+PLAN
+- `src/store/writer.py`: `build_row()` and `append_row()` with fixed header.
+- `src/store/cache.py`: `upsert_card`, `upsert_price`, optional `get_price_from_cache` (can be a stub returning None initially).
+
+APPLY
+Implement writer and cache as specified in earlier prompts. Ensure header order matches `CSV_HEADER`.
+
+TEST
+- `tests/test_writer.py`: write two rows; reopen to assert header + order + JSON string for price_sources.
+- Basic cache create/upsert test.

@@ -1,0 +1,76 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Implement ANN search loader + ORB/RANSAC re-ranking to confirm matches.
+
+THINK
+We load `index/hnsw.bin` + `index/meta.parquet`, search k-NN, then re-rank top few via ORB keypoint inliers.
+
+PLAN
+- `src/match/ann_index.py` → load/search
+- `src/match/rerank.py` → ORB + RANSAC inlier count
+- `src/match/score.py` → distance + inliers → confidence
+
+APPLY
+Create `src/match/ann_index.py`:
+```
+import hnswlib, numpy as np, pandas as pd
+from pathlib import Path
+from typing import List, Tuple
+
+class AnnIndex:
+    def __init__(self, index_dir: Path):
+        self.index_dir = index_dir
+        self.meta = pd.read_parquet(index_dir/"meta.parquet")
+        self.row_to_id = {i:cid for i,cid in enumerate(self.meta["card_id"].tolist())}
+        self.index = hnswlib.Index(space="cosine", dim=512)
+        self.index.load_index(str(index_dir/"hnsw.bin"))
+        self.index.set_ef(64)
+
+    def search(self, vec: np.ndarray, k: int) -> List[Tuple[str, float]]:
+        labels, dists = self.index.knn_query(vec, k=k)
+        return [(self.row_to_id[int(l)], float(d)) for l, d in zip(labels[0], dists[0])]
+```
+
+Create `src/match/rerank.py`:
+```
+import cv2, numpy as np
+from typing import List, Tuple
+
+def orb_inliers(query_bgr: np.ndarray, cand_bgr: np.ndarray) -> int:
+    orb = cv2.ORB_create(nfeatures=1000)
+    kp1, des1 = orb.detectAndCompute(query_bgr, None)
+    kp2, des2 = orb.detectAndCompute(cand_bgr, None)
+    if des1 is None or des2 is None: return 0
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+    matches = bf.knnMatch(des1, des2, k=2)
+    good = [m for m,n in matches if n and m.distance < 0.75*n.distance]
+    if len(good) < 8: return len(good)
+    src = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1,1,2)
+    dst = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1,1,2)
+    H, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+    return int(mask.sum()) if mask is not None else len(good)
+
+def rerank_with_orb(query_bgr: np.ndarray, candidates: List[Tuple[str, str, float]], topk:int=5)->Tuple[str,int]:
+    best = ("", -1)
+    for cid, img_path, _dist in candidates[:topk]:
+        cand = cv2.imread(img_path)
+        if cand is None: continue
+        inl = orb_inliers(query_bgr, cand)
+        if inl > best[1]: best = (cid, inl)
+    return best
+```
+
+Create `src/match/score.py`:
+```
+def confidence_from(distance: float, inliers: int) -> float:
+    d_score = max(0.0, 1.0 - distance)   # cosine: smaller is better
+    i_score = min(1.0, inliers / 60.0)   # >=60 inliers ~ strong
+    return 0.6 * d_score + 0.4 * i_score
+```
+
+TEST
+- Mock vectors (random) to ensure `AnnIndex.search` returns list of tuples.
+- `rerank_with_orb` returns (cid, inliers) given two small images.
+- Log success.

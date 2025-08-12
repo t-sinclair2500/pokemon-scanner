@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # OCR settings
     TESSERACT_PATH: Optional[str] = None
     OCR_CONFIDENCE_THRESHOLD: int = 60
+    
+    # Index and output directories
+    INDEX_DIR: str = "index"
+    OUTPUT_DIR: str = "output"
 
     @field_validator("POKEMON_TCG_API_KEY", mode="before")
     @classmethod
@@ -62,6 +66,12 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+def ensure_dirs(st: Settings) -> None:
+    """Ensure required directories exist."""
+    Path(st.CACHE_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(st.INDEX_DIR).mkdir(parents=True, exist_ok=True)
+    Path(st.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
 def ensure_cache_and_output_dirs():
     """Ensure cache and output directories exist."""
     # Get the project root directory (where this file is located)
@@ -75,6 +85,13 @@ def ensure_cache_and_output_dirs():
     output_dir = project_root / "output"
     output_dir.mkdir(exist_ok=True)
 
+
+def resolve_tesseract(st: Settings) -> str | None:
+    """Get Tesseract path, with fallback to common locations."""
+    if st.TESSERACT_PATH and Path(st.TESSERACT_PATH).exists():
+        return st.TESSERACT_PATH
+    brew = "/opt/homebrew/bin/tesseract"
+    return brew if Path(brew).exists() else None
 
 def resolve_tesseract_path() -> str:
     """Get Tesseract path, with fallback to common locations."""

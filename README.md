@@ -119,6 +119,25 @@ TESSERACT_PATH=/opt/homebrew/bin/tesseract
 OCR_CONFIDENCE_THRESHOLD=60
 ```
 
+## Setup and Index Building
+
+### Build the Reference Index
+
+Before running the scanner, you need to build the reference index:
+
+```bash
+python -m src.reference.build_index
+```
+
+This command will:
+- Download English Pokemon TCG cards from pokemontcg.io
+- Download card images for visual matching
+- Generate embeddings for each card
+- Build HNSW index for fast similarity search
+- Create `index/hnsw.bin` and `index/meta.parquet` files
+
+**Note**: The index building process may take several minutes depending on your internet connection and system performance.
+
 ## Usage
 
 ### One-Pass Scanning (Recommended)
@@ -146,7 +165,7 @@ python -m src.cli run
 
 ## CSV Output Schema
 
-The scanner outputs data to `./output/cards_YYYYMMDD.csv` with the following fixed header:
+The scanner outputs data to `./output/cards_YYYY-MM-DD.csv` with the following fixed header:
 
 ```csv
 timestamp_iso,card_id,name,number,set_name,set_id,rarity,tcgplayer_market_usd,cardmarket_trend_eur,cardmarket_avg30_eur,pricing_updatedAt_tcgplayer,pricing_updatedAt_cardmarket,source_image_path,price_sources
@@ -172,7 +191,7 @@ timestamp_iso,card_id,name,number,set_name,set_id,rarity,tcgplayer_market_usd,ca
 
 The scanner automatically stores all data locally in organized files:
 
-- **CSV files**: Daily card data with fixed schema (`cards_YYYYMMDD.csv`)
+- **CSV files**: Daily card data with fixed schema (`cards_YYYY-MM-DD.csv`)
 - **Image storage**: All scanned card images in `output/images/`
 - **Detailed logs**: JSON logs with processing details in `output/logs/`
 - **Cache database**: SQLite database for card information in `cache/cards.db`
@@ -181,7 +200,7 @@ The scanner automatically stores all data locally in organized files:
 
 ```
 output/
-├── cards_YYYYMMDD.csv           # Main card data (fixed schema)
+├── cards_YYYY-MM-DD.csv           # Main card data (fixed schema)
 ├── images/                      # Scanned card images
 ├── logs/                        # Detailed processing logs
 ├── backups/                     # Automated data backups
@@ -197,6 +216,13 @@ All settings can be configured via environment variables:
 - `CAMERA_INDEX`: Camera device index (default 0)
 - `OCR_CONFIDENCE_THRESHOLD`: Minimum OCR confidence (default 60)
 - `CACHE_EXPIRE_HOURS`: Cache expiration time (default 24)
+
+## Important Notes
+
+- **Tesseract Path**: On macOS M2, Tesseract is automatically detected at `/opt/homebrew/bin/tesseract`
+- **Confidence Thresholds**: Default OCR confidence is 60% for production use
+- **Rate Limiting**: The scanner respects API rate limits (~5 queries per second)
+- **Index Requirements**: The reference index must be built before scanning
 
 ## Local Storage Benefits
 
@@ -234,6 +260,7 @@ pytest -q
 **OCR accuracy low**: Improve lighting and ensure card is clearly visible
 **Tesseract not found**: Run `brew install tesseract` on macOS
 **Permission errors**: Ensure the application has camera access permissions
+**Index not found**: Run `python -m src.reference.build_index` to create the reference index
 
 ### Getting Help
 

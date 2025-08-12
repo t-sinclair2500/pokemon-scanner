@@ -1,0 +1,17 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+If visual confidence is below review threshold and OCR finds collector number, refine with resolver search-by-number (+ optional name).
+
+THINK
+Use `search_by_number_name(number, name)` and prefer exact number match; rank by name when provided.
+
+PLAN
+- In `src/cli.py` run loop: when confidence < CONFIDENCE_REVIEW, call OCR for number; if found, call resolver search; accept best result or prompt user to pick.
+
+APPLY
+Wire the fallback logic; ensure CSV still uses fixed schema and one row per card.
+
+TEST
+- Mock resolver response; verify path takes OCR number and resolves to a valid card_id.

@@ -1,0 +1,22 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Implement capture loop with SPACE/ESC, perspective warp to fixed size, and ROI overlays (top name band, bottom number band).
+
+THINK
+We need a stable, simple operator UI: on SPACE capture, warp, then pass onward; two translucent ROI bars help framing.
+
+PLAN
+- `src/capture/camera.py`: open camera, draw overlays, SPACE to capture, ESC to exit.
+- `src/capture/warp.py`: detect largest quadrilateral, warp to (WARP_W, WARP_H).
+- `src/capture/overlay.py`: draw ROI rectangles using constants.
+
+APPLY
+Implement these modules (fill stubs if present) using names from constants:
+- WARP_W, WARP_H
+- ROI_NAME, ROI_NUMBER
+
+TEST
+- Headless import check.
+- Manual smoke later.

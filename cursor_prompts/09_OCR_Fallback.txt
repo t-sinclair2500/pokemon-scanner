@@ -1,0 +1,17 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Add minimal OCR fallback to extract collector number “X/Y” when visual confidence is low.
+
+THINK
+We only OCR the bottom ROI with Tesseract `--psm 7` and whitelist `0123456789/`, then regex parse.
+
+PLAN
+- `src/ocr/extract.py`: implement `get_collector_number(warped)` using ROI_NUMBER.
+
+APPLY
+Add function with preprocessing: grayscale → adaptive threshold → Tesseract config → regex `\b\d{1,3}\s*/\s*\d{1,3}\b` → return dict {num:int, den:int} or None.
+
+TEST
+- `tests/test_ocr_regex.py` for noisy inputs and valid formats.

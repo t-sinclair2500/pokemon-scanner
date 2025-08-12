@@ -1,0 +1,20 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Add small, deterministic tests for pricing flattening, writer header order, resolver backoff, and OCR number parsing.
+
+THINK
+We don’t need full integration tests; just key units that prevent regressions.
+
+PLAN
+- `tests/test_pricing.py`: verify fallback order (normal → holofoil → reverse) and missing fields.
+- `tests/test_writer.py`: assert fixed header and column order; price_sources JSON string.
+- `tests/test_resolve_backoff.py`: mock 429 → 200 sequence.
+- `tests/test_ocr_regex.py`: collector number parsing cases.
+
+APPLY
+Implement tests using pytest and simple fixtures.
+
+TEST
+- `pytest -q` passes.

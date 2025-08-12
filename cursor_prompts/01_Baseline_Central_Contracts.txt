@@ -1,0 +1,166 @@
+You are my senior Python pair programmer. 
+Execute this task using a THINK → PLAN → APPLY → TEST loop, and append a line to TASKLOG.md after completion:
+[YYYY-MM-DD HH:MM:SS] [P1] DONE – Baseline constants/types/config/log ready.
+
+GOAL
+Create the shared vocabulary the whole app uses (central contracts): CSV schema, constants, dataclasses, and config/log setup.
+
+THINK
+We need a single source of truth to prevent naming drift: CSV header, ROI constants, ANN/embedding constants, confidence thresholds, warp size, base types.
+
+PLAN
+- Add `src/core/constants.py` and `src/core/types.py` with final names.
+- Implement `src/utils/config.py` and `src/utils/log.py` foundations.
+- Minimal `requirements.txt` update (no Sheets, no paid APIs).
+- Create `TASKLOG.md` (if missing).
+
+APPLY
+1) Overwrite requirements with only necessary deps for Phase-1 scaffolding:
+```
+opencv-python
+numpy
+pillow
+pytesseract
+aiohttp
+requests
+typer[all]
+pydantic
+pydantic-settings
+python-dotenv
+pandas
+structlog
+rapidfuzz>=3
+```
+2) Create `src/core/constants.py`:
+```
+from typing import Final, List
+
+CSV_HEADER: Final[List[str]] = [
+    "timestamp_iso","card_id","name","number","set_name","set_id","rarity",
+    "tcgplayer_market_usd","cardmarket_trend_eur","cardmarket_avg30_eur",
+    "pricing_updatedAt_tcgplayer","pricing_updatedAt_cardmarket",
+    "source_image_path","price_sources"
+]
+
+# Visual match defaults
+EMBED_MODEL: Final[str] = "ViT-B-32"
+EMBED_PRETRAINED: Final[str] = "openai"
+ANN_SPACE: Final[str] = "cosine"
+ANN_TOPK: Final[int] = 10
+ANN_RERANK_TOPK: Final[int] = 5
+
+# Confidence thresholds
+CONFIDENCE_ACCEPT: Final[float] = 0.85
+CONFIDENCE_REVIEW: Final[float] = 0.70
+
+# Warp target size (w, h)
+WARP_W: Final[int] = 900
+WARP_H: Final[int] = 1260
+
+# OCR fallback ROIs (normalized y1,y2,x1,x2)
+ROI_NAME = (0.05, 0.14, 0.08, 0.92)
+ROI_NUMBER = (0.88, 0.98, 0.05, 0.95)
+
+RATE_LIMIT_QPS: Final[float] = 5.0
+BACKOFF_S = [0.2, 1.0, 3.0]
+```
+3) Create `src/core/types.py`:
+```
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
+
+@dataclass
+class MatchResult:
+    card_id: str
+    distance: float
+    inliers: int
+    confidence: float
+
+@dataclass
+class ResolvedCard:
+    card_id: str
+    name: str
+    number: str
+    set_name: str
+    set_id: str
+    rarity: Optional[str]
+    images: Dict[str, str]  # small/large
+    raw_tcgplayer: Optional[Dict[str, Any]]
+    raw_cardmarket: Optional[Dict[str, Any]]
+
+@dataclass
+class PriceData:
+    tcgplayer_market_usd: Optional[float]
+    cardmarket_trend_eur: Optional[float]
+    cardmarket_avg30_eur: Optional[float]
+    pricing_updatedAt_tcgplayer: str
+    pricing_updatedAt_cardmarket: str
+    price_sources: List[str]
+
+@dataclass
+class CardRow:
+    timestamp_iso: str
+    card: ResolvedCard
+    price: PriceData
+    source_image_path: str
+```
+4) Create `src/utils/config.py`:
+```
+import os
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    LOG_LEVEL: str = "INFO"
+    POKEMON_TCG_API_KEY: str | None = None
+    CACHE_DB_PATH: str = "cache/cards.db"
+    CACHE_EXPIRE_HOURS: int = 24
+    CAMERA_INDEX: int = 0
+    TESSERACT_PATH: str | None = None
+    INDEX_DIR: str = "index"
+    OUTPUT_DIR: str = "output"
+
+def ensure_dirs(st: Settings) -> None:
+    Path(st.CACHE_DB_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(st.INDEX_DIR).mkdir(parents=True, exist_ok=True)
+    Path(st.OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+
+def resolve_tesseract(st: Settings) -> str | None:
+    if st.TESSERACT_PATH and Path(st.TESSERACT_PATH).exists():
+        return st.TESSERACT_PATH
+    brew = "/opt/homebrew/bin/tesseract"
+    return brew if Path(brew).exists() else None
+```
+5) Create `src/utils/log.py`:
+```
+import structlog
+import logging
+
+def configure_logging(level: str = "INFO"):
+    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO))
+    structlog.configure(
+        processors=[
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.JSONRenderer(),
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+def get_logger(name: str):
+    return structlog.get_logger(name)
+
+class LoggerMixin:
+    def __init__(self):
+        self.log = get_logger(self.__class__.__name__)
+```
+6) Create/append `TASKLOG.md`.
+
+TEST
+- Run:
+  - `pip install -r requirements.txt`
+  - `python -c "from src.utils.config import Settings, ensure_dirs; from src.utils.log import configure_logging, get_logger; s=Settings(); ensure_dirs(s); configure_logging(); get_logger('smoke').info('ok')"`
+- Append TASKLOG.md entry on success.

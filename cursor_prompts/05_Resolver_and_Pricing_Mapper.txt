@@ -1,0 +1,95 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Robust resolver (pokemontcg.io v2) with backoff + pricing flattening to fixed fields.
+
+THINK
+Only use pokemontcg.io; add exponential backoff for 429/5xx. Pricing from embedded fields. Use `rapidfuzz` for name ranking when needed.
+
+PLAN
+- `src/resolve/poketcg.py`: `_fetch_json`, `get_card(card_id)`, `search_by_number_name(number, name)`.
+- `src/pricing/poketcg_prices.py`: `map_price_blocks(card_json) -> PriceData`.
+
+APPLY
+Create/overwrite `src/resolve/poketcg.py`:
+```
+import aiohttp, asyncio
+from rapidfuzz import fuzz
+from typing import Optional
+from src.utils.config import Settings
+from src.core.types import ResolvedCard
+from src.core.constants import BACKOFF_S
+
+BASE = "https://api.pokemontcg.io/v2/cards"
+
+async def _fetch_json(url: str, params: dict|None, headers: dict|None) -> dict:
+    for i, delay in enumerate([0.0,*BACKOFF_S], start=0):
+        if delay: await asyncio.sleep(delay)
+        async with aiohttp.ClientSession(headers=headers) as s:
+            async with s.get(url, params=params) as r:
+                if r.status in (429,500,502,503,504) and i < len(BACKOFF_S):
+                    continue
+                r.raise_for_status()
+                return await r.json()
+    raise RuntimeError("unreachable")
+
+def _to_resolved(card: dict) -> ResolvedCard:
+    return ResolvedCard(
+        card_id=card["id"], name=card["name"], number=card.get("number",""),
+        set_name=card["set"]["name"], set_id=card["set"]["id"], rarity=card.get("rarity"),
+        images=card["images"], raw_tcgplayer=card.get("tcgplayer"), raw_cardmarket=card.get("cardmarket")
+    )
+
+async def get_card(card_id: str, api_key: Optional[str]) -> ResolvedCard | None:
+    headers = {"X-Api-Key": api_key} if api_key else {}
+    j = await _fetch_json(f"{BASE}/{card_id}", None, headers)
+    data = j.get("data"); 
+    return _to_resolved(data) if data else None
+
+async def search_by_number_name(number: str|None, name: str|None, api_key: Optional[str]) -> ResolvedCard | None:
+    q = []
+    if number: q.append(f'number:"{number}"')
+    if name: q.append(f'name:"{name}"')
+    params = {"q":" ".join(q) if q else None, "pageSize": 50}
+    headers = {"X-Api-Key": api_key} if api_key else {}
+    j = await _fetch_json(BASE, params, headers)
+    candidates = j.get("data", [])
+    if not candidates: return None
+    pool = [c for c in candidates if not number or str(c.get("number","")).strip()==str(number).strip()]
+    pool = pool or candidates
+    if name:
+        pool.sort(key=lambda c: fuzz.ratio(name.lower(), c["name"].lower()), reverse=True)
+    return _to_resolved(pool[0])
+```
+
+Create/overwrite `src/pricing/poketcg_prices.py`:
+```
+from typing import Optional
+from src.core.types import PriceData
+
+def _first_market(tcg: dict|None) -> Optional[float]:
+    if not tcg: return None
+    prices = tcg.get("prices") or {}
+    for key in ("normal","holofoil","reverseHolofoil"):
+        v = prices.get(key) or {}
+        m = v.get("market")
+        if m is not None: return float(m)
+    return None
+
+def map_price_blocks(card_json: dict) -> PriceData:
+    tcg = card_json.get("tcgplayer")
+    ckm = card_json.get("cardmarket") or {}
+    return PriceData(
+        tcgplayer_market_usd=_first_market(tcg),
+        cardmarket_trend_eur=(ckm.get("prices") or {}).get("trendPrice"),
+        cardmarket_avg30_eur=(ckm.get("prices") or {}).get("avg30"),
+        pricing_updatedAt_tcgplayer=(tcg or {}).get("updatedAt",""),
+        pricing_updatedAt_cardmarket=ckm.get("updatedAt",""),
+        price_sources=["pokemontcg.io"],
+    )
+```
+
+TEST
+- Fixture JSON for one card; assert flattening and fallback order.
+- Mocked 429→200 flow returns successfully.
