@@ -2,6 +2,8 @@
 
 A comprehensive tool for scanning, identifying, and pricing Pokemon cards using computer vision and OCR.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Phase-1 Scope
 
 **Current Version**: CSV-only local storage with accurate recognition and flat CSV storage.
