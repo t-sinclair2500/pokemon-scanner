@@ -17,8 +17,10 @@ class CacheManager:
     
     def __init__(self, db_path: str = "cache/cards.db"):
         self.logger = get_logger(__name__)
+        # Resolve path relative to project root
+        project_root = Path(__file__).parent.parent.parent
+        self.db_path = project_root / db_path
         ensure_cache_dir()
-        self.db_path = Path(db_path)
         self._init_database()
     
     def _init_database(self):

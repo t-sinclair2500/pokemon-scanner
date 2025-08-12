@@ -216,7 +216,9 @@ async def run(
                         csv_writer.write_row(row_data)
                         
                         # Save warped image
-                        image_path = Path(output_dir) / "images" / f"card_{card_count}.jpg"
+                        # Resolve output directory relative to project root
+                        project_root = Path(__file__).parent.parent
+                        image_path = project_root / output_dir / "images" / f"card_{card_count}.jpg"
                         image_path.parent.mkdir(parents=True, exist_ok=True)
                         cv2.imwrite(str(image_path), warped_image)
                         
@@ -263,7 +265,9 @@ async def run(
         console.print(f"Success rate: {(successful_cards/card_count*100):.1f}%" if card_count > 0 else "N/A")
         
         # Show output location
-        output_path = Path(output_dir)
+        # Resolve output directory relative to project root
+        project_root = Path(__file__).parent.parent
+        output_path = project_root / output_dir
         if output_path.exists():
             csv_files = list(output_path.glob("*.csv"))
             image_files = list((output_path / "images").glob("*.jpg"))
@@ -453,7 +457,9 @@ async def price(
         console.print(f"Success rate: {(successful_count/processed_count*100):.1f}%" if processed_count > 0 else "N/A")
         
         # Show output location
-        output_path = Path(output_dir)
+        # Resolve output directory relative to project root
+        project_root = Path(__file__).parent.parent
+        output_path = project_root / output_dir
         if output_path.exists():
             csv_files = list(output_path.glob("*.csv"))
             console.print(f"\n[bold]Output Files:[/bold]")
@@ -572,7 +578,9 @@ def scan(
                     
                     # Save the image and insert scan into cache
                     image_filename = f"scan_{scan_count}.jpg"
-                    image_path = Path(output_dir) / "images" / image_filename
+                    # Resolve output directory relative to project root
+                    project_root = Path(__file__).parent.parent
+                    image_path = project_root / output_dir / "images" / image_filename
                     image_path.parent.mkdir(parents=True, exist_ok=True)
                     cv2.imwrite(str(image_path), card_image)
                     
@@ -633,7 +641,9 @@ def scan(
         console.print(f"Success rate: {(successful_scans/scan_count*100):.1f}%" if scan_count > 0 else "N/A")
         
         # Show output location
-        output_path = Path(output_dir)
+        # Resolve output directory relative to project root
+        project_root = Path(__file__).parent.parent
+        output_path = project_root / output_dir
         if output_path.exists():
             csv_files = list(output_path.glob("*.csv"))
             image_files = list((output_path / "images").glob("*.jpg"))

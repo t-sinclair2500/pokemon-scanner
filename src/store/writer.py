@@ -34,7 +34,9 @@ class CSVWriter:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self.output_dir = Path("output")
+        # Resolve output directory relative to project root
+        project_root = Path(__file__).parent.parent.parent
+        self.output_dir = project_root / "output"
         self.output_dir.mkdir(exist_ok=True)
         
         # Main CSV file for card data

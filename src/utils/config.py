@@ -2,41 +2,73 @@
 
 from typing import Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import field_validator
 from pathlib import Path
 import os
 
 class Settings(BaseSettings):
     # Pokemon TCG API
-    POKEMON_TCG_API_KEY: Optional[str] = Field(None, env="POKEMON_TCG_API_KEY")
+    POKEMON_TCG_API_KEY: Optional[str] = None
     
     # Logging
-    LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
+    LOG_LEVEL: str = "INFO"
     
     # Cache and storage
-    CACHE_DB_PATH: str = Field("cache/cards.db", env="CACHE_DB_PATH")
-    CACHE_EXPIRE_HOURS: int = Field(24, env="CACHE_EXPIRE_HOURS")
+    CACHE_DB_PATH: str = "cache/cards.db"
+    CACHE_EXPIRE_HOURS: int = 24
     
     # Camera settings
-    CAMERA_INDEX: int = Field(0, env="CAMERA_INDEX")
+    CAMERA_INDEX: int = 0
     
     # OCR settings
-    TESSERACT_PATH: Optional[str] = Field(None, env="TESSERACT_PATH")
-    OCR_CONFIDENCE_THRESHOLD: int = Field(60, env="OCR_CONFIDENCE_THRESHOLD")
+    TESSERACT_PATH: Optional[str] = None
+    OCR_CONFIDENCE_THRESHOLD: int = 60
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    @field_validator('POKEMON_TCG_API_KEY', mode='before')
+    @classmethod
+    def validate_api_key(cls, v):
+        """Convert empty/whitespace strings to None."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+    
+    @field_validator('LOG_LEVEL', mode='before')
+    @classmethod
+    def validate_log_level(cls, v):
+        """Convert empty/whitespace strings to default."""
+        if isinstance(v, str) and not v.strip():
+            return "INFO"
+        return v
+    
+    @field_validator('CACHE_DB_PATH', mode='before')
+    @classmethod
+    def validate_cache_path(cls, v):
+        """Convert empty/whitespace strings to default."""
+        if isinstance(v, str) and not v.strip():
+            return "cache/cards.db"
+        return v
 
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "ignore"
+    }
+
+# Global settings instance
 settings = Settings()
 
 def ensure_cache_and_output_dirs():
     """Ensure cache and output directories exist."""
-    cache_dir = Path(settings.CACHE_DB_PATH).parent
+    # Get the project root directory (where this file is located)
+    project_root = Path(__file__).parent.parent.parent
+    
+    # Resolve cache directory relative to project root
+    cache_dir = project_root / Path(settings.CACHE_DB_PATH).parent
     cache_dir.mkdir(parents=True, exist_ok=True)
     
-    output_dir = Path("output")
+    # Resolve output directory relative to project root
+    output_dir = project_root / "output"
     output_dir.mkdir(exist_ok=True)
 
 def resolve_tesseract_path() -> str:
