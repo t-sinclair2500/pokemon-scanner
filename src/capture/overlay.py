@@ -24,7 +24,6 @@ class CameraOverlay(LoggerMixin):
     """Handles camera feed overlay with detection status and ROI indicators."""
     
     def __init__(self):
-        self.logger = get_logger(self.__class__.__name__)
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         self.font_scale = 0.7
         self.font_thickness = 2
@@ -59,6 +58,99 @@ class CameraOverlay(LoggerMixin):
             self._draw_text_with_background(
                 overlay_frame, confidence_text, text_pos, color
             )
+        
+        return overlay_frame
+    
+    def draw_ocr_roi_rectangles(self, frame: np.ndarray, status: str = "detected") -> np.ndarray:
+        """Draw the two specific ROI rectangles for OCR as specified in requirements."""
+        overlay_frame = frame.copy()
+        height, width = frame.shape[:2]
+        
+        # Choose color based on status
+        if status == "detected":
+            color = OverlayColor.CARD_DETECTED.value
+        elif status == "scanning":
+            color = OverlayColor.CARD_SCANNING.value
+        elif status == "processing":
+            color = OverlayColor.PROCESSING.value
+        else:
+            color = OverlayColor.CARD_ERROR.value
+        
+        # TOP name band: y 5-14% height, x 8-92%
+        top_y_start = int(height * 0.05)
+        top_y_end = int(height * 0.14)
+        top_x_start = int(width * 0.08)
+        top_x_end = int(width * 0.92)
+        
+        # BOTTOM collector band: y 88-98% height, x 5-95%
+        bottom_y_start = int(height * 0.88)
+        bottom_y_end = int(height * 0.98)
+        bottom_x_start = int(width * 0.05)
+        bottom_x_end = int(width * 0.95)
+        
+        # Draw translucent rectangles
+        overlay = overlay_frame.copy()
+        
+        # Top ROI (name band)
+        cv2.rectangle(
+            overlay,
+            (top_x_start, top_y_start),
+            (top_x_end, top_y_end),
+            color,
+            -1  # Filled rectangle
+        )
+        
+        # Bottom ROI (collector band)
+        cv2.rectangle(
+            overlay,
+            (bottom_x_start, bottom_y_start),
+            (bottom_x_end, bottom_y_end),
+            color,
+            -1  # Filled rectangle
+        )
+        
+        # Apply transparency (30% overlay, 70% original)
+        cv2.addWeighted(overlay_frame, 0.7, overlay, 0.3, 0, overlay_frame)
+        
+        # Draw borders for clarity
+        cv2.rectangle(
+            overlay_frame,
+            (top_x_start, top_y_start),
+            (top_x_end, top_y_end),
+            color,
+            2  # Border thickness
+        )
+        
+        cv2.rectangle(
+            overlay_frame,
+            (bottom_x_start, bottom_y_start),
+            (bottom_x_end, bottom_y_end),
+            color,
+            2  # Border thickness
+        )
+        
+        # Add labels
+        cv2.putText(
+            overlay_frame,
+            "NAME",
+            (top_x_start + 5, top_y_start - 5),
+            self.font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA
+        )
+        
+        cv2.putText(
+            overlay_frame,
+            "COLLECTOR",
+            (bottom_x_start + 5, bottom_y_start - 5),
+            self.font,
+            0.5,
+            color,
+            1,
+            cv2.LINE_AA
+        )
         
         return overlay_frame
     

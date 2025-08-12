@@ -32,7 +32,7 @@ class OCRResult:
 class CardInfo:
     """Extracted card information."""
     name: Optional[str] = None
-    collector_number: Optional[str] = None
+    collector_number: Optional[Dict[str, int]] = None
     confidence: float = 0.0
     ocr_result: Optional[OCRResult] = None
 
@@ -46,53 +46,147 @@ class OCRExtractor(LoggerMixin):
         self.confidence_threshold = settings.OCR_CONFIDENCE_THRESHOLD
         
         # Collector number regex pattern
-        self.number_pattern = re.compile(r'\b\d{1,3}\s*/\s*\d{1,3}\b')
+        self.number_pattern = re.compile(r'\b([1-9]\d{0,2})\s*/\s*([1-9]\d{0,2})\b')
         
         self.logger.info("OCR extractor initialized", 
                         tesseract_path=self.tesseract_path,
                         confidence_threshold=self.confidence_threshold)
     
-    def extract_card_info(self, card_image: np.ndarray) -> CardInfo:
-        """Extract card name and collector number from image."""
+    def get_name(self, warped_image: np.ndarray) -> Tuple[Optional[str], float]:
+        """
+        Extract card name from TOP ROI (y 5-14% height, x 8-92% width).
+        
+        Returns:
+            Tuple of (extracted_text, confidence_score)
+        """
+        try:
+            height, width = warped_image.shape[:2]
+            
+            # Define ROI for name: TOP (y 5-14% height, x 8-92% width)
+            y1, y2 = int(height * 0.05), int(height * 0.14)
+            x1, x2 = int(width * 0.08), int(width * 0.92)
+            
+            # Extract ROI
+            name_roi = warped_image[y1:y2, x1:x2]
+            
+            # Apply light denoising
+            preprocessed = self._preprocess_name_roi(name_roi)
+            
+            # Use Tesseract with '--psm 7' (single line)
+            text = pytesseract.image_to_string(
+                preprocessed,
+                config='--psm 7'
+            )
+            
+            # Strip artifacts and clean text
+            cleaned_text = self._clean_name_text(text)
+            
+            # Calculate confidence as ratio of A-Z/a-z characters
+            confidence = self._calculate_name_confidence(cleaned_text)
+            
+            self.logger.debug("Name extraction completed", 
+                            text=cleaned_text, confidence=confidence,
+                            roi=f"y:{y1}-{y2}, x:{x1}-{x2}")
+            
+            return cleaned_text, confidence
+            
+        except Exception as e:
+            self.logger.error("Name extraction failed", error=str(e))
+            return None, 0.0
+    
+    def get_collector_number(self, warped_image: np.ndarray) -> Optional[Dict[str, int]]:
+        """
+        Extract collector number from BOTTOM ROI (y 88-98% height, x 5-95% width).
+        
+        Returns:
+            Dict with 'num' and 'den' keys, or None if extraction fails
+        """
+        try:
+            height, width = warped_image.shape[:2]
+            
+            # Define ROI for collector number: BOTTOM (y 88-98% height, x 5-95% width)
+            y1, y2 = int(height * 0.88), int(height * 0.98)
+            x1, x2 = int(width * 0.05), int(width * 0.95)
+            
+            # Extract ROI
+            number_roi = warped_image[y1:y2, x1:x2]
+            
+            # Convert to grayscale and apply adaptive threshold
+            preprocessed = self._preprocess_number_roi(number_roi)
+            
+            # Use Tesseract '--psm 7' with whitelist '0123456789/'
+            text = pytesseract.image_to_string(
+                preprocessed,
+                config='--psm 7 -c tessedit_char_whitelist=0123456789/'
+            )
+            
+            # Apply regex to extract collector number
+            match = self.number_pattern.search(text)
+            if match:
+                num = int(match.group(1))
+                den = int(match.group(2))
+                
+                self.logger.debug("Collector number extraction completed", 
+                                number=f"{num}/{den}",
+                                roi=f"y:{y1}-{y2}, x:{x1}-{x2}")
+                
+                return {'num': num, 'den': den}
+            else:
+                self.logger.debug("No collector number pattern found", 
+                                extracted_text=text,
+                                roi=f"y:{y1}-{y2}, x:{x1}-{x2}")
+                return None
+                
+        except Exception as e:
+            self.logger.error("Collector number extraction failed", error=str(e))
+            return None
+    
+    def extract_card_info(self, warped_image: np.ndarray) -> CardInfo:
+        """
+        Extract card information from warped image.
+        
+        Returns:
+            CardInfo dataclass with name, collector_number, and confidence
+        """
         try:
             self.logger.info("Starting OCR extraction", 
-                           image_size=f"{card_image.shape[1]}x{card_image.shape[0]}")
+                           image_size=f"{warped_image.shape[1]}x{warped_image.shape[0]}")
             
             # Extract name from top band
-            name_result = self._extract_name(card_image)
+            name_text, name_confidence = self.get_name(warped_image)
             
             # Extract collector number from bottom band
-            number_result = self._extract_collector_number(card_image)
+            collector_number = self.get_collector_number(warped_image)
             
             # Calculate overall confidence
-            confidence = self._calculate_confidence(name_result, number_result)
+            confidence = self._calculate_overall_confidence(name_text, name_confidence, collector_number)
             
             # Create OCR result
             ocr_result = OCRResult(
-                name=name_result.get('text'),
-                collector_number=number_result.get('text'),
+                name=name_text,
+                collector_number=f"{collector_number['num']}/{collector_number['den']}" if collector_number else None,
                 confidence=confidence,
                 raw_text={
-                    'name': name_result.get('text', ''),
-                    'collector_number': number_result.get('text', '')
+                    'name': name_text or '',
+                    'collector_number': f"{collector_number['num']}/{collector_number['den']}" if collector_number else ''
                 },
                 preprocessing_steps={
-                    'name': name_result.get('preprocessing', {}),
-                    'collector_number': number_result.get('preprocessing', {})
+                    'name': {'confidence': name_confidence},
+                    'collector_number': {'extracted': collector_number is not None}
                 }
             )
             
             # Create card info
             card_info = CardInfo(
-                name=name_result.get('text'),
-                collector_number=number_result.get('text'),
+                name=name_text,
+                collector_number=collector_number,
                 confidence=confidence,
                 ocr_result=ocr_result
             )
             
             self.logger.info("OCR extraction completed",
                            name=card_info.name,
-                           collector_number=card_info.collector_number,
+                           collector_number=f"{collector_number['num']}/{collector_number['den']}" if collector_number else None,
                            confidence=confidence)
             
             return card_info
@@ -101,80 +195,8 @@ class OCRExtractor(LoggerMixin):
             self.logger.error("OCR extraction failed", error=str(e))
             return CardInfo()
     
-    def _extract_name(self, card_image: np.ndarray) -> Dict[str, Any]:
-        """Extract card name from top band (5-14% height, 8-92% width)."""
-        try:
-            height, width = card_image.shape[:2]
-            
-            # Define ROI for name
-            y1, y2 = int(height * 0.05), int(height * 0.14)
-            x1, x2 = int(width * 0.08), int(width * 0.92)
-            
-            # Extract ROI
-            name_roi = card_image[y1:y2, x1:x2]
-            
-            # Preprocess for better OCR
-            preprocessed = self._preprocess_for_name(name_roi)
-            
-            # OCR with specific settings for name
-            text = pytesseract.image_to_string(
-                preprocessed,
-                config='--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-            )
-            
-            # Clean text
-            cleaned_text = self._clean_name_text(text)
-            
-            # Validate name
-            if self._validate_name(cleaned_text):
-                return {
-                    'text': cleaned_text,
-                    'preprocessing': {'method': 'name_optimized', 'roi': f"{x1},{y1},{x2},{y2}"}
-                }
-            else:
-                return {'text': None, 'preprocessing': {'method': 'name_optimized', 'roi': f"{x1},{y1},{x2},{y2}"}}
-                
-        except Exception as e:
-            self.logger.error("Name extraction failed", error=str(e))
-            return {'text': None, 'preprocessing': {'error': str(e)}}
-    
-    def _extract_collector_number(self, card_image: np.ndarray) -> Dict[str, Any]:
-        """Extract collector number from bottom band (88-98% height, 5-95% width)."""
-        try:
-            height, width = card_image.shape[:2]
-            
-            # Define ROI for collector number
-            y1, y2 = int(height * 0.88), int(height * 0.98)
-            x1, x2 = int(width * 0.05), int(width * 0.95)
-            
-            # Extract ROI
-            number_roi = card_image[y1:y2, x1:x2]
-            
-            # Preprocess for better OCR
-            preprocessed = self._preprocess_for_number(number_roi)
-            
-            # OCR with specific settings for numbers
-            text = pytesseract.image_to_string(
-                preprocessed,
-                config='--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789/'
-            )
-            
-            # Extract collector number using regex
-            match = self.number_pattern.search(text)
-            if match:
-                return {
-                    'text': match.group(),
-                    'preprocessing': {'method': 'number_optimized', 'roi': f"{x1},{y1},{x2},{y2}"}
-                }
-            else:
-                return {'text': None, 'preprocessing': {'method': 'number_optimized', 'roi': f"{x1},{y1},{x2},{y2}"}}
-                
-        except Exception as e:
-            self.logger.error("Collector number extraction failed", error=str(e))
-            return {'text': None, 'preprocessing': {'error': str(e)}}
-    
-    def _preprocess_for_name(self, roi: np.ndarray) -> np.ndarray:
-        """Preprocess ROI for name extraction."""
+    def _preprocess_name_roi(self, roi: np.ndarray) -> np.ndarray:
+        """Preprocess ROI for name extraction with light denoising."""
         try:
             # Convert to grayscale
             if len(roi.shape) == 3:
@@ -182,7 +204,7 @@ class OCRExtractor(LoggerMixin):
             else:
                 gray = roi
             
-            # Apply bilateral filter to reduce noise while preserving edges
+            # Apply light denoising with bilateral filter
             filtered = cv2.bilateralFilter(gray, 9, 75, 75)
             
             # Apply adaptive threshold for better text contrast
@@ -190,17 +212,13 @@ class OCRExtractor(LoggerMixin):
                 filtered, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
             )
             
-            # Morphological operations to clean up text
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-            cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-            
-            return cleaned
+            return thresh
             
         except Exception as e:
-            self.logger.error("Name preprocessing failed", error=str(e))
+            self.logger.error("Name ROI preprocessing failed", error=str(e))
             return roi
     
-    def _preprocess_for_number(self, roi: np.ndarray) -> np.ndarray:
+    def _preprocess_number_roi(self, roi: np.ndarray) -> np.ndarray:
         """Preprocess ROI for collector number extraction."""
         try:
             # Convert to grayscale
@@ -209,19 +227,15 @@ class OCRExtractor(LoggerMixin):
             else:
                 gray = roi
             
-            # Apply median blur to reduce noise
-            blurred = cv2.medianBlur(gray, 3)
+            # Apply adaptive threshold
+            thresh = cv2.adaptiveThreshold(
+                gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+            )
             
-            # Apply Otsu's thresholding
-            _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            
-            # Invert (white text on black background)
-            inverted = cv2.bitwise_not(thresh)
-            
-            return inverted
+            return thresh
             
         except Exception as e:
-            self.logger.error("Number preprocessing failed", error=str(e))
+            self.logger.error("Number ROI preprocessing failed", error=str(e))
             return roi
     
     def _clean_name_text(self, text: str) -> str:
@@ -241,33 +255,38 @@ class OCRExtractor(LoggerMixin):
         
         return cleaned
     
-    def _validate_name(self, name: str) -> bool:
-        """Validate extracted name."""
-        if not name:
-            return False
+    def _calculate_name_confidence(self, text: str) -> float:
+        """
+        Calculate confidence as ratio of A-Z/a-z characters in result.
         
-        # Check length
-        if len(name) < 2 or len(name) > 50:
-            return False
+        Returns:
+            Confidence score from 0.0 to 1.0
+        """
+        if not text:
+            return 0.0
         
-        # Check if it contains at least some letters
-        if not re.search(r'[a-zA-Z]', name):
-            return False
+        # Count alphabetic characters
+        alpha_chars = sum(1 for c in text if c.isalpha())
+        total_chars = len(text)
         
-        return True
+        if total_chars == 0:
+            return 0.0
+        
+        confidence = alpha_chars / total_chars
+        return confidence
     
-    def _calculate_confidence(self, name_result: Dict, number_result: Dict) -> float:
+    def _calculate_overall_confidence(self, name_text: Optional[str], name_confidence: float, collector_number: Optional[Dict[str, int]]) -> float:
         """Calculate overall confidence score."""
         confidence = 0.0
         total_weight = 0.0
         
         # Name confidence (weight: 0.6)
-        if name_result.get('text'):
-            confidence += 0.6
+        if name_text:
+            confidence += name_confidence * 0.6
             total_weight += 0.6
         
         # Collector number confidence (weight: 0.4)
-        if number_result.get('text'):
+        if collector_number:
             confidence += 0.4
             total_weight += 0.4
         

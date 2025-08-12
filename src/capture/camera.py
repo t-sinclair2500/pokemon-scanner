@@ -48,6 +48,56 @@ class CameraCapture(LoggerMixin):
             self.logger.error("Camera initialization failed", error=str(e))
             return False
     
+    def run_camera_loop(self, on_frame_capture=None, on_exit=None):
+        """Run camera loop with SPACE/ESC handling.
+        
+        Args:
+            on_frame_capture: Callback function called when SPACE is pressed
+            on_exit: Callback function called when ESC is pressed
+        """
+        if not self.is_initialized:
+            self.logger.error("Camera not initialized")
+            return
+            
+        self.logger.info("Starting camera loop - SPACE to capture, ESC to exit")
+        
+        try:
+            while True:
+                # Get current frame
+                ret, frame = self.cap.read()
+                if not ret:
+                    self.logger.warning("Failed to read frame")
+                    continue
+                
+                # Display frame
+                cv2.imshow('Pokemon Scanner - SPACE to capture, ESC to exit', frame)
+                
+                # Handle key presses
+                key = cv2.waitKey(1) & 0xFF
+                
+                if key == 27:  # ESC key
+                    self.logger.info("ESC pressed - exiting camera loop")
+                    if on_exit:
+                        on_exit()
+                    break
+                elif key == 32:  # SPACE key
+                    self.logger.info("SPACE pressed - capturing stabilized frame")
+                    if on_frame_capture:
+                        stable_frame = self.capture_stable_frame()
+                        if stable_frame is not None:
+                            on_frame_capture(stable_frame)
+                        else:
+                            self.logger.warning("Failed to capture stable frame")
+                
+                # Small delay to prevent high CPU usage
+                time.sleep(0.01)
+                
+        except KeyboardInterrupt:
+            self.logger.info("Keyboard interrupt received")
+        finally:
+            cv2.destroyAllWindows()
+            self.logger.info("Camera loop ended")
+    
     def capture_stable_frame(self, stabilization_frames: int = 5) -> Optional[np.ndarray]:
         """Capture a stable frame by averaging multiple frames."""
         if not self.is_initialized:
@@ -101,13 +151,12 @@ class CameraCapture(LoggerMixin):
             if not contours:
                 return None
             
-            # Find the largest contour (likely the card)
+            # Find largest contour (assumed to be the card)
             largest_contour = max(contours, key=cv2.contourArea)
             area = cv2.contourArea(largest_contour)
             
-            # Filter by minimum area (to avoid noise)
-            min_area = frame.shape[0] * frame.shape[1] * 0.1  # 10% of frame
-            if area < min_area:
+            # Filter by minimum area
+            if area < 10000:  # Minimum area threshold
                 return None
             
             # Approximate contour to polygon

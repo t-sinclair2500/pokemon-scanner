@@ -87,13 +87,22 @@ class CSVWriter:
             price_sources_json = json.dumps([price_sources]) if price_sources else '[]'
         
         # Build row in exact header order
+        # Handle nested set data safely
+        set_data = pokemon_card.get('set')
+        if set_data is None:
+            set_name = ''
+            set_id = ''
+        else:
+            set_name = set_data.get('name', '')
+            set_id = set_data.get('id', '')
+        
         row = {
             "timestamp_iso": datetime.now().isoformat(),
             "card_id": pokemon_card.get('id', ''),
             "name": pokemon_card.get('name', ''),
             "number": pokemon_card.get('number', ''),
-            "set_name": pokemon_card.get('set', {}).get('name', ''),
-            "set_id": pokemon_card.get('set', {}).get('id', ''),
+            "set_name": set_name,
+            "set_id": set_id,
             "rarity": pokemon_card.get('rarity', ''),
             "tcgplayer_market_usd": price_data.get('tcgplayer_market_usd', ''),
             "cardmarket_trend_eur": price_data.get('cardmarket_trend_eur', ''),

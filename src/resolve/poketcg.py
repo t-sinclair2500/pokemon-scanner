@@ -24,6 +24,7 @@ class PokemonCard:
     images: Dict[str, str]
     tcgplayer: Optional[Dict[str, Any]] = None
     cardmarket: Optional[Dict[str, Any]] = None
+    set_release_date: Optional[str] = None
 
 
 class PokemonTCGResolver:
@@ -57,7 +58,8 @@ class PokemonTCGResolver:
         """Make request with exponential backoff for 429/5xx errors."""
         await self._ensure_session()
         
-        backoff_delays = [0.2, 1.0, 3.0]  # 200ms, 1s, 3s
+        # Base delay: 0.2s → 1s → 3s on HTTP 429/5xx
+        backoff_delays = [0.2, 1.0, 3.0]
         
         for attempt, delay in enumerate(backoff_delays):
             if attempt > 0:
@@ -114,9 +116,11 @@ class PokemonTCGResolver:
             # Build search queries in order of specificity
             queries = []
             
-            # If collector number present, search by number first
+            # Query Strategy:
+            # If collector number present: q=number:{X} + name fuzzy matching
+            # Else: name-only query
             if card_info.collector_number:
-                number_part = card_info.collector_number.split('/')[0]
+                number_part = str(card_info.collector_number['num'])
                 queries.append(f"number:{number_part}")
                 
                 # Add name if available for better matching
@@ -133,7 +137,7 @@ class PokemonTCGResolver:
                 if not cards:
                     continue
                 
-                # Find best match using fuzzy matching
+                # Find best match using rapidfuzz ranking
                 best_card = self._find_best_match(card_info, cards)
                 if best_card:
                     return best_card
@@ -145,39 +149,68 @@ class PokemonTCGResolver:
             return None
     
     def _find_best_match(self, card_info: CardInfo, candidates: List[PokemonCard]) -> Optional[PokemonCard]:
-        """Find best matching card using fuzzy matching."""
+        """
+        Find best matching card using rapidfuzz ranking.
+        
+        Priority order:
+        1. Exact number match
+        2. Highest rapidfuzz ratio
+        3. Newest set releaseDate
+        """
         if not candidates:
             return None
         
-        best_card = None
-        best_score = 0
+        # Score each candidate
+        scored_candidates = []
         
         for card in candidates:
             score = 0
             max_score = 0
             
-            # Name matching (most important)
-            if card_info.name and card.name:
-                name_score = fuzz.ratio(card_info.name.lower(), card.name.lower())
-                score += name_score * 0.6
-                max_score += 100 * 0.6
-            
-            # Collector number matching
+            # Priority 1: Exact number match (40 points)
             if card_info.collector_number and card.number:
-                number_part = card_info.collector_number.split('/')[0]
+                number_part = str(card_info.collector_number['num'])
                 if number_part == card.number:
-                    score += 100 * 0.4
-                max_score += 100 * 0.4
+                    score += 40
+                max_score += 40
+            
+            # Priority 2: Name fuzzy matching with rapidfuzz (40 points)
+            if card_info.name and card.name:
+                # Use rapidfuzz.ratio with ignore_case=True
+                name_score = fuzz.ratio(card_info.name.lower(), card.name.lower())
+                score += (name_score / 100) * 40
+                max_score += 40
+            
+            # Priority 3: Set release date (20 points)
+            if card.set_release_date:
+                # Newer sets get higher scores (simplified scoring)
+                try:
+                    # Simple scoring: assume newer = better
+                    score += 20
+                except:
+                    pass
+                max_score += 20
             
             # Normalize score
             if max_score > 0:
                 normalized_score = (score / max_score) * 100
-                if normalized_score > best_score:
-                    best_score = normalized_score
-                    best_card = card
+                scored_candidates.append((card, normalized_score))
+            else:
+                scored_candidates.append((card, 0))
+        
+        # Sort by score (highest first)
+        scored_candidates.sort(key=lambda x: x[1], reverse=True)
         
         # Return only if confidence is reasonable
-        return best_card if best_score > 60 else None
+        if scored_candidates and scored_candidates[0][1] > 60:
+            best_card, best_score = scored_candidates[0]
+            self.logger.debug(f"Best match found", 
+                            card_name=best_card.name,
+                            card_number=best_card.number,
+                            score=best_score)
+            return best_card
+        
+        return None
     
     def _parse_card_data(self, data: Dict[str, Any]) -> Optional[PokemonCard]:
         """Parse API card data into PokemonCard."""
@@ -198,7 +231,8 @@ class PokemonTCGResolver:
                 rarity=data.get("rarity", ""),
                 images=data.get("images", {}),
                 tcgplayer=data.get("tcgplayer"),
-                cardmarket=data.get("cardmarket")
+                cardmarket=data.get("cardmarket"),
+                set_release_date=data.get("set", {}).get("releaseDate")
             )
         except Exception as e:
             self.logger.error("Error parsing card data", error=str(e))

@@ -10,7 +10,7 @@ from .utils.config import settings
 from .capture.warp import card_detector, perspective_corrector
 from .ocr.extract import ocr_extractor, CardInfo
 from .resolve.poketcg import pokemon_resolver, PokemonCard
-from .pricing.poketcg_prices import pokemon_pricer, CardPrice, PriceData
+from .pricing.poketcg_prices import pokemon_pricer, PriceData
 from .store.cache import card_cache
 from .store.writer import csv_writer
 from .store.logger import card_data_logger
@@ -33,7 +33,6 @@ __all__ = [
     "pokemon_resolver",
     "PokemonCard",
     "pokemon_pricer",
-    "CardPrice",
     "PriceData", 
     "card_cache",
     "csv_writer",

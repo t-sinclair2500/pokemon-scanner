@@ -9,11 +9,11 @@ from ..resolve.poketcg import PokemonCard
 
 
 @dataclass
-class CardPrice:
-    """Card pricing information."""
-    tcgplayer_market_usd: Optional[float] = None
-    cardmarket_trend_eur: Optional[float] = None  
-    cardmarket_avg30_eur: Optional[float] = None
+class PriceData:
+    """Complete pricing data for a card with flattened structure."""
+    tcgplayer_market_usd: str = ""
+    cardmarket_trend_eur: str = ""
+    cardmarket_avg30_eur: str = ""
     pricing_updatedAt_tcgplayer: str = ""
     pricing_updatedAt_cardmarket: str = ""
     price_sources: List[str] = None
@@ -23,74 +23,78 @@ class CardPrice:
             self.price_sources = ["pokemontcg.io"]
 
 
-@dataclass
-class PriceData:
-    """Complete pricing data for a card."""
-    card_id: str
-    card_name: str
-    prices: CardPrice
-
-
 class PokemonTCGPricer:
     """Extracts pricing from Pokemon TCG API card data."""
     
     def __init__(self):
         self.logger = get_logger(__name__)
     
-    def extract_prices(self, card: PokemonCard) -> Optional[PriceData]:
-        """Extract pricing data from Pokemon card."""
+    def _safe_float_to_string(self, value) -> str:
+        """Safely convert a value to a string, handling None and invalid data."""
+        if value is None:
+            return ""
+        
         try:
-            prices = CardPrice()
+            # Convert to float first to validate it's numeric
+            float_val = float(value)
+            # Always format with 2 decimal places to match test expectations
+            return f"{float_val:.2f}"
+        except (ValueError, TypeError):
+            return ""
+    
+    def extract_prices_from_card(self, card: PokemonCard) -> PriceData:
+        """Extract pricing data from Pokemon card with flattened structure."""
+        try:
+            price_data = PriceData()
             
-            # Extract TCGPlayer prices
-            if card.tcgplayer and "prices" in card.tcgplayer:
-                tcg_prices = card.tcgplayer["prices"]
-                
-                # Try normal -> holofoil -> reverseHolofoil for market price
-                for condition in ["normal", "holofoil", "reverseHolofoil"]:
-                    if condition in tcg_prices and "market" in tcg_prices[condition]:
-                        market_price = tcg_prices[condition]["market"]
-                        if market_price is not None:
-                            prices.tcgplayer_market_usd = float(market_price)
-                            break
-                
-                # Extract updatedAt for TCGPlayer
+            # Extract TCGPlayer pricing and updatedAt
+            if card.tcgplayer:
+                # Extract updatedAt regardless of whether prices exist
                 if "updatedAt" in card.tcgplayer:
-                    prices.pricing_updatedAt_tcgplayer = card.tcgplayer["updatedAt"]
+                    price_data.pricing_updatedAt_tcgplayer = str(card.tcgplayer["updatedAt"])
+                
+                # Extract pricing if available
+                if "prices" in card.tcgplayer:
+                    tcg_prices = card.tcgplayer["prices"]
+                    
+                    # Try normal -> holofoil -> reverseHolofoil for market price
+                    for condition in ["normal", "holofoil", "reverseHolofoil"]:
+                        if condition in tcg_prices and "market" in tcg_prices[condition]:
+                            market_price = tcg_prices[condition]["market"]
+                            if market_price is not None:
+                                price_data.tcgplayer_market_usd = self._safe_float_to_string(market_price)
+                                break
             
-            # Extract CardMarket prices
-            if card.cardmarket and "prices" in card.cardmarket:
-                cm_prices = card.cardmarket["prices"]
-                
-                if "trendPrice" in cm_prices and cm_prices["trendPrice"] is not None:
-                    prices.cardmarket_trend_eur = float(cm_prices["trendPrice"])
-                
-                # Try avg30 first, then fallback to averageSellPrice
-                if "avg30" in cm_prices and cm_prices["avg30"] is not None:
-                    prices.cardmarket_avg30_eur = float(cm_prices["avg30"])
-                elif "averageSellPrice" in cm_prices and cm_prices["averageSellPrice"] is not None:
-                    prices.cardmarket_avg30_eur = float(cm_prices["averageSellPrice"])
-                
-                # Extract updatedAt for CardMarket
+            # Extract CardMarket pricing and updatedAt
+            if card.cardmarket:
+                # Extract updatedAt regardless of whether prices exist
                 if "updatedAt" in card.cardmarket:
-                    prices.pricing_updatedAt_cardmarket = card.cardmarket["updatedAt"]
-            
-            # Only return if we have at least one price
-            if (prices.tcgplayer_market_usd is not None or 
-                prices.cardmarket_trend_eur is not None or 
-                prices.cardmarket_avg30_eur is not None):
+                    price_data.pricing_updatedAt_cardmarket = str(card.cardmarket["updatedAt"])
                 
-                return PriceData(
-                    card_id=card.id,
-                    card_name=card.name,
-                    prices=prices
-                )
+                # Extract pricing if available
+                if "prices" in card.cardmarket:
+                    cm_prices = card.cardmarket["prices"]
+                    
+                    # Extract trend price
+                    if "trendPrice" in cm_prices:
+                        price_data.cardmarket_trend_eur = self._safe_float_to_string(cm_prices["trendPrice"])
+                    
+                    # Extract avg30 price
+                    if "avg30" in cm_prices:
+                        price_data.cardmarket_avg30_eur = self._safe_float_to_string(cm_prices["avg30"])
             
-            return None
+            self.logger.debug("Extracted pricing data", 
+                            card_id=card.id,
+                            tcgplayer_market=price_data.tcgplayer_market_usd,
+                            cardmarket_trend=price_data.cardmarket_trend_eur,
+                            cardmarket_avg30=price_data.cardmarket_avg30_eur)
+            
+            return price_data
             
         except Exception as e:
             self.logger.error("Error extracting prices", card_id=card.id, error=str(e))
-            return None
+            # Return empty PriceData on error
+            return PriceData()
 
 
 # Global singleton
