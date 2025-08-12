@@ -87,6 +87,10 @@ ipython_config.py
 #   intended to run in multiple environments; otherwise, check them in:
 # .python-version
 
+# Python version management
+.python-version
+.pypy-version
+
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
 #   However, in case of collaboration, if having platform-specific dependencies or dependencies
@@ -127,6 +131,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Allow example environment file
+!.env.example
 
 # Spyder project settings
 .spyderproject
@@ -170,11 +177,20 @@ cython_debug/
 
 # MacOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
 
 # Project specific
 *.sqlite3
@@ -184,13 +200,25 @@ service-account.json
 screenshots/
 *.pptx
 
-# Cache directories
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Cache directories (but allow .gitkeep files)
 cache/
+!cache/.gitkeep
 __pycache__/
 
 # Pokemon Scanner specific
 output/
+!output/.gitkeep
 backups/
+!backups/.gitkeep
+
+# Data files (but allow test fixtures)
 *.zip
 *.xlsx
 *.csv
@@ -198,4 +226,9 @@ backups/
 *.png
 *.jpeg
 *.json
+
+# Allow test fixtures
 !tests/fixtures/*.json
+!tests/fixtures/*.csv
+!tests/fixtures/*.png
+!tests/fixtures/*.jpg

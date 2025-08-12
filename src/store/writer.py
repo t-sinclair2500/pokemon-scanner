@@ -78,9 +78,30 @@ class CSVWriter:
         
         self.logger.debug("Row written to CSV", row_dict=row_dict)
     
+    def _extract_card_data(self, pokemon_card) -> Dict[str, Any]:
+        """Extract card data from either a dict or PokemonCard object."""
+        if hasattr(pokemon_card, 'id'):
+            # PokemonCard object
+            return {
+                'id': pokemon_card.id,
+                'name': pokemon_card.name,
+                'number': pokemon_card.number,
+                'set': {
+                    'name': pokemon_card.set_name,
+                    'id': pokemon_card.set_id
+                },
+                'rarity': pokemon_card.rarity
+            }
+        else:
+            # Dict object
+            return pokemon_card
+
     def build_row(self, pokemon_card: Dict[str, Any], price_data: Dict[str, Any], 
                   source_image_path: str) -> Dict[str, Any]:
         """Build a row dictionary with columns in EXACT header order."""
+        # Extract card data consistently
+        card_data = self._extract_card_data(pokemon_card)
+        
         # Ensure price_sources is serialized as JSON string
         price_sources = price_data.get('price_sources', [])
         if isinstance(price_sources, list):
@@ -90,7 +111,7 @@ class CSVWriter:
         
         # Build row in exact header order
         # Handle nested set data safely
-        set_data = pokemon_card.get('set')
+        set_data = card_data.get('set')
         if set_data is None:
             set_name = ''
             set_id = ''
@@ -100,17 +121,17 @@ class CSVWriter:
         
         row = {
             "timestamp_iso": datetime.now().isoformat(),
-            "card_id": pokemon_card.get('id', ''),
-            "name": pokemon_card.get('name', ''),
-            "number": pokemon_card.get('number', ''),
+            "card_id": card_data.get('id', ''),
+            "name": card_data.get('name', ''),
+            "number": card_data.get('number', ''),
             "set_name": set_name,
             "set_id": set_id,
-            "rarity": pokemon_card.get('rarity', ''),
-            "tcgplayer_market_usd": price_data.get('tcgplayer_market_usd', ''),
-            "cardmarket_trend_eur": price_data.get('cardmarket_trend_eur', ''),
-            "cardmarket_avg30_eur": price_data.get('cardmarket_avg30_eur', ''),
-            "pricing_updatedAt_tcgplayer": price_data.get('pricing_updatedAt_tcgplayer', ''),
-            "pricing_updatedAt_cardmarket": price_data.get('pricing_updatedAt_cardmarket', ''),
+            "rarity": card_data.get('rarity', ''),
+            "tcgplayer_market_usd": str(price_data.get('tcgplayer_market_usd', '')),
+            "cardmarket_trend_eur": str(price_data.get('cardmarket_trend_eur', '')),
+            "cardmarket_avg30_eur": str(price_data.get('cardmarket_avg30_eur', '')),
+            "pricing_updatedAt_tcgplayer": str(price_data.get('pricing_updatedAt_tcgplayer', '')),
+            "pricing_updatedAt_cardmarket": str(price_data.get('pricing_updatedAt_cardmarket', '')),
             "source_image_path": source_image_path,
             "price_sources": price_sources_json
         }

@@ -12,6 +12,25 @@ A comprehensive tool for scanning, identifying, and pricing Pokemon cards using 
 - Fixed CSV schema with exact column order
 - Local SQLite caching for performance
 
+## Project Structure
+
+```
+pokemon-scanner/
+├── src/                          # Main application code
+│   ├── capture/                  # Camera and image capture
+│   ├── ocr/                      # Text extraction and processing
+│   ├── resolve/                  # Card identification and matching
+│   ├── pricing/                  # Price lookup and data extraction
+│   ├── store/                    # Data storage and caching
+│   ├── ui/                       # User interface components
+│   └── utils/                    # Configuration and utilities
+├── tests/                        # Test suite and fixtures
+├── cache/                        # SQLite database and cache files
+├── output/                       # Generated CSV files and images
+├── scripts/                      # Development and utility scripts
+└── docs/                         # Documentation and examples
+```
+
 ## Features
 
 - **Real-time scanning** - Live camera feed with card detection
@@ -24,7 +43,7 @@ A comprehensive tool for scanning, identifying, and pricing Pokemon cards using 
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.11+ (tested on Python 3.13)
 - Webcam or camera
 - Tesseract OCR
 - macOS (Apple Silicon) - tested on Apple Silicon Macs
@@ -35,7 +54,7 @@ A comprehensive tool for scanning, identifying, and pricing Pokemon cards using 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/pokemon-scanner.git
+git clone https://github.com/t-sinclair2500/pokemon-scanner.git
 cd pokemon-scanner
 ```
 
@@ -58,7 +77,7 @@ If you prefer manual setup:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/pokemon-scanner.git
+git clone https://github.com/t-sinclair2500/pokemon-scanner.git
 cd pokemon-scanner
 ```
 
@@ -78,7 +97,9 @@ pip install -r requirements.txt
 brew install tesseract
 ```
 
-5. Configure environment variables (create `.env` file):
+5. Configure environment variables:
+   - Copy `.env.example` to `.env`: `cp .env.example .env`
+   - Edit `.env` with your settings:
 ```bash
 # Pokemon TCG API (optional, for enhanced card data)
 POKEMON_TCG_API_KEY=your_api_key_here
@@ -162,10 +183,9 @@ The scanner automatically stores all data locally in organized files:
 output/
 ├── cards_YYYYMMDD.csv           # Main card data (fixed schema)
 ├── images/                      # Scanned card images
-│   └── scan_YYYYMMDD_HHMMSS_*.jpg
 ├── logs/                        # Detailed processing logs
-│   └── scan_YYYYMMDD_HHMMSS_*.json
-└── backups/                     # Automated data backups
+├── backups/                     # Automated data backups
+└── Various CSV files            # Scan summaries and detailed logs
 ```
 
 ## Configuration Options
@@ -198,6 +218,28 @@ pytest -q
 ```bash
 ./dev.sh
 ```
+
+### Additional Tools
+
+- **`./setup.sh`** - Automated installation and setup
+- **`./start.sh`** - Quick start script
+- **`Makefile`** - Common development commands
+- **`./dev.sh`** - Development environment setup
+
+## Troubleshooting
+
+### Common Issues
+
+**Camera not working**: Ensure your camera is not being used by another application
+**OCR accuracy low**: Improve lighting and ensure card is clearly visible
+**Tesseract not found**: Run `brew install tesseract` on macOS
+**Permission errors**: Ensure the application has camera access permissions
+
+### Getting Help
+
+- Check the logs in `output/logs/` for detailed error information
+- Review the test suite in `tests/` for usage examples
+- Open an issue on GitHub for bugs or feature requests
 
 ## License
 

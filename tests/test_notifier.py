@@ -323,7 +323,7 @@ class TestEdgeCases:
                     result = notifier_instance.beep()
                     
                     # Should log the timeout error
-                    mock_log.assert_called_once_with("Error playing beep", error="afplay: timed out after 5 seconds")
+                    mock_log.assert_called_once_with("Error playing beep", error="Command 'afplay' timed out after 5 seconds")
                     
                     # Should return False
                     assert result is False

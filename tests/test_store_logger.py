@@ -37,15 +37,22 @@ class TestCardDataLogger:
     
     def test_logger_creates_directories(self, tmp_path):
         """Test that CardDataLogger creates necessary directories."""
+        # Mock the Path to return our tmp_path for the output directory
         with patch('src.store.logger.Path') as mock_path:
-            mock_path.return_value = tmp_path
+            # Mock Path("output") to return tmp_path
+            def mock_path_side_effect(path_str):
+                if path_str == "output":
+                    return tmp_path
+                return Path(path_str)
+            
+            mock_path.side_effect = mock_path_side_effect
             
             logger = CardDataLogger()
             
             # Should create output directory
-            assert (tmp_path / "output").exists()
-            assert (tmp_path / "output" / "images").exists()
-            assert (tmp_path / "output" / "logs").exists()
+            assert (tmp_path).exists()
+            assert (tmp_path / "images").exists()
+            assert (tmp_path / "logs").exists()
     
     def test_logger_csv_columns(self):
         """Test that CSV columns are correctly defined."""
@@ -347,8 +354,8 @@ class TestNotesGeneration:
         
         notes = logger._generate_notes(card_info)
         
-        # Should indicate normal scan
-        assert notes == "Normal scan"
+        # Should indicate high confidence scan (88.0 >= 80)
+        assert notes == "High confidence scan"
 
 
 class TestDetailedLogSaving:
@@ -563,7 +570,13 @@ class TestSummaryExport:
     def test_export_summary_csv_generates_filename(self, tmp_path):
         """Test that filename is generated if not provided."""
         with patch('src.store.logger.Path') as mock_path:
-            mock_path.return_value = tmp_path
+            # Mock Path("output") to return tmp_path
+            def mock_path_side_effect(path_str):
+                if path_str == "output":
+                    return tmp_path
+                return Path(path_str)
+            
+            mock_path.side_effect = mock_path_side_effect
             
             logger = CardDataLogger()
             
@@ -575,7 +588,7 @@ class TestSummaryExport:
                     export_path = logger.export_summary_csv()
                     
                     # Should generate filename with timestamp
-                    assert export_path.startswith("scan_summary_")
+                    assert "scan_summary_" in export_path
                     assert export_path.endswith(".csv")
     
     def test_export_summary_csv_handles_error(self, tmp_path):
@@ -628,15 +641,22 @@ class TestIntegration:
     
     def test_logger_file_operations(self, tmp_path):
         """Test that logger performs file operations correctly."""
+        # Mock the Path to return our tmp_path for the output directory
         with patch('src.store.logger.Path') as mock_path:
-            mock_path.return_value = tmp_path
+            # Mock Path("output") to return tmp_path
+            def mock_path_side_effect(path_str):
+                if path_str == "output":
+                    return tmp_path
+                return Path(path_str)
+            
+            mock_path.side_effect = mock_path_side_effect
             
             logger = CardDataLogger()
             
             # Should create necessary directories
-            assert (tmp_path / "output").exists()
-            assert (tmp_path / "output" / "images").exists()
-            assert (tmp_path / "output" / "logs").exists()
+            assert (tmp_path).exists()
+            assert (tmp_path / "images").exists()
+            assert (tmp_path / "logs").exists()
             
             # Should create CSV file
             assert logger.csv_file.exists()

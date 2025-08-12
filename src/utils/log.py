@@ -63,7 +63,9 @@ class LoggerMixin:
             'start_time': time.time(),
             **kwargs
         }
-        self.logger.info(f"{event} started", **context)
+        # Remove event from context to avoid duplicate parameter
+        log_context = {k: v for k, v in context.items() if k != 'event'}
+        self.logger.info(f"{event} started", **log_context)
         return context
     
     def log_success(self, context: Dict[str, Any], **kwargs: Any):
@@ -72,7 +74,9 @@ class LoggerMixin:
             duration_ms = int((time.time() - context['start_time']) * 1000)
             kwargs['duration_ms'] = duration_ms
         
-        self.logger.info(f"{context.get('event', 'operation')} completed", **context, **kwargs)
+        # Remove event from context to avoid duplicate parameter
+        log_context = {k: v for k, v in context.items() if k != 'event'}
+        self.logger.info(f"{context.get('event', 'operation')} completed", **log_context, **kwargs)
     
     def log_error(self, context: Dict[str, Any], error: Exception, **kwargs: Any):
         """Log operation error with duration."""
@@ -80,9 +84,11 @@ class LoggerMixin:
             duration_ms = int((time.time() - context['start_time']) * 1000)
             kwargs['duration_ms'] = duration_ms
         
+        # Remove event from context to avoid duplicate parameter
+        log_context = {k: v for k, v in context.items() if k != 'event'}
         self.logger.error(
             f"{context.get('event', 'operation')} failed", 
-            **context, 
+            **log_context, 
             error=str(error), 
             error_type=type(error).__name__,
             **kwargs

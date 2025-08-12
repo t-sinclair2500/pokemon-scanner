@@ -36,8 +36,7 @@ class CacheManager:
                         set_name TEXT NOT NULL,
                         number TEXT NOT NULL,
                         rarity TEXT,
-                        created_at TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
+                        created_at TEXT NOT NULL
                     )
                 """)
                 
@@ -64,8 +63,7 @@ class CacheManager:
                         ts TEXT NOT NULL,
                         image_path TEXT NOT NULL,
                         ocr_json TEXT,
-                        status TEXT NOT NULL DEFAULT 'NEW',
-                        created_at TEXT NOT NULL
+                        status TEXT NOT NULL DEFAULT 'NEW'
                     )
                 """)
                 
@@ -135,8 +133,8 @@ class CacheManager:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO cards 
-                    (card_id, name, set_id, set_name, number, rarity, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (card_id, name, set_id, set_name, number, rarity, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     card.id, 
                     card.name, 
@@ -144,7 +142,6 @@ class CacheManager:
                     card.set_name, 
                     card.number, 
                     card.rarity,
-                    now,
                     now
                 ))
                 conn.commit()
@@ -197,9 +194,9 @@ class CacheManager:
             
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute("""
-                    INSERT INTO scans (ts, image_path, ocr_json, status, created_at)
-                    VALUES (?, ?, ?, 'NEW', ?)
-                """, (now, image_path, json.dumps(ocr_data) if ocr_data else None, now))
+                    INSERT INTO scans (ts, image_path, ocr_json, status)
+                    VALUES (?, ?, ?, 'NEW')
+                """, (now, image_path, json.dumps(ocr_data) if ocr_data else None))
                 conn.commit()
                 
                 scan_id = cursor.lastrowid
@@ -248,7 +245,7 @@ class CacheManager:
                 cursor = conn.execute("""
                     SELECT * FROM scans 
                     WHERE status = 'NEW' 
-                    ORDER BY created_at
+                    ORDER BY ts
                 """)
                 
                 scans = []
@@ -258,8 +255,7 @@ class CacheManager:
                         "ts": row["ts"],
                         "image_path": row["image_path"],
                         "ocr_data": json.loads(row["ocr_json"]) if row["ocr_json"] else {},
-                        "status": row["status"],
-                        "created_at": row["created_at"]
+                        "status": row["status"]
                     })
                 
                 self.logger.debug("Retrieved new scans", count=len(scans))
