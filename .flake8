@@ -1,0 +1,35 @@
+[flake8]
+# Light, reasonable linting configuration
+max-line-length = 88
+max-complexity = 10
+ignore = 
+    # Common exceptions for development
+    E203
+    W503
+    E501
+    F401
+    F403
+    F405
+    E731
+    W291
+    W292
+    W293
+    W391
+
+# Exclude common directories
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .pytest_cache,
+    .benchmarks,
+    cache,
+    output,
+    backups
+
+# Show source code for errors
+show-source = True
+
+# Show statistics
+statistics = True

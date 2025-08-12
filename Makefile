@@ -1,7 +1,7 @@
 # Pokemon Scanner Makefile
 # Common development tasks
 
-.PHONY: help setup install test clean run scan price config
+.PHONY: help setup install test clean run scan price config format lint check quality
 
 # Default target
 help:
@@ -15,16 +15,19 @@ help:
 	@echo "Testing:"
 	@echo "  test      - Run all tests"
 	@echo "  test-verbose - Run tests with verbose output"
+	@echo "  test-integration - Run only integration tests"
+	@echo "  test-unit    - Run only unit tests"
 	@echo ""
 	@echo "Running:"
 	@echo "  scan      - Scan cards and log results with high accuracy"
 	@echo "  summary   - Show summary of all scanned cards"
 	@echo "  export    - Export scan data to CSV"
 	@echo ""
-	@echo "Development:"
-	@echo "  format    - Format code with black (if installed)"
-	@echo "  lint      - Lint code with flake8 (if installed)"
+	@echo "Code Quality:"
+	@echo "  format    - Format code with black and isort"
+	@echo "  lint      - Lint code with flake8"
 	@echo "  check     - Run format and lint checks"
+	@echo "  quality   - Run all code quality checks (format, lint, test)"
 
 # Setup virtual environment and install dependencies
 setup:
@@ -60,6 +63,16 @@ test-verbose:
 	@echo "Running tests with verbose output..."
 	@source venv/bin/activate && python -m pytest -v
 
+# Run integration tests only
+test-integration:
+	@echo "Running integration tests..."
+	@source venv/bin/activate && python -m pytest tests/ -m integration -v
+
+# Run unit tests only
+test-unit:
+	@echo "Running unit tests..."
+	@source venv/bin/activate && python -m pytest tests/ -m unit -v
+
 # Scan cards and log results
 scan:
 	@echo "Starting card scanning mode..."
@@ -75,16 +88,22 @@ export:
 	@echo "Exporting scan data..."
 	@source venv/bin/activate && python -m src.cli export
 
-# Format code (optional - requires black)
+# Format code with black and isort
 format:
-	@echo "Formatting code..."
+	@echo "Formatting code with black..."
 	@source venv/bin/activate && black src/ tests/
+	@echo "Sorting imports with isort..."
+	@source venv/bin/activate && isort src/ tests/
 
-# Lint code (optional - requires flake8)
+# Lint code with flake8
 lint:
-	@echo "Linting code..."
+	@echo "Linting code with flake8..."
 	@source venv/bin/activate && flake8 src/ tests/
 
 # Run format and lint checks
 check: format lint
-	@echo "All checks completed!"
+	@echo "Format and lint checks completed!"
+
+# Run all code quality checks
+quality: check test
+	@echo "All code quality checks completed!"

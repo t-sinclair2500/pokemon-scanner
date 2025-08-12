@@ -1,7 +1,7 @@
 """Simple notification system with audio feedback."""
 
-import sys
 import subprocess
+import sys
 from typing import Optional
 
 from ..utils.log import get_logger
@@ -9,16 +9,19 @@ from ..utils.log import get_logger
 
 class SimpleNotifier:
     """Simple notification system with beep and status messages."""
-    
+
     def __init__(self):
         self.logger = get_logger(__name__)
-    
+
     def beep(self) -> bool:
         """Play system beep sound."""
         try:
             if sys.platform == "darwin":  # macOS
-                subprocess.run(["afplay", "/System/Library/Sounds/Glass.aiff"], 
-                             capture_output=True, check=False)
+                subprocess.run(
+                    ["afplay", "/System/Library/Sounds/Glass.aiff"],
+                    capture_output=True,
+                    check=False,
+                )
                 return True
             else:
                 # Fallback to terminal bell
@@ -27,7 +30,7 @@ class SimpleNotifier:
         except Exception as e:
             self.logger.debug("Error playing beep", error=str(e))
             return False
-    
+
     def status_toast(self, message: str, level: str = "info"):
         """Display status message (no-op fallback if no GUI available)."""
         # In a real GUI application, this would show a toast notification

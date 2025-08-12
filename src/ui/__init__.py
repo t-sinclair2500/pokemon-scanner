@@ -2,6 +2,4 @@
 
 from .notifier import notifier
 
-__all__ = [
-    'notifier'
-]
+__all__ = ["notifier"]

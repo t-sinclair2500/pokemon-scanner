@@ -369,8 +369,6 @@ class TestEdgeCases:
     
     def test_notifier_memory_usage(self):
         """Test that notifier doesn't leak memory."""
-        notifier_instance = SimpleNotifier()
-        
         # Create many instances and check they don't accumulate
         instances = []
         for i in range(100):
