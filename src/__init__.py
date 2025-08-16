@@ -6,8 +6,8 @@ __description__ = "A comprehensive tool for scanning Pokemon cards using compute
 
 from .capture.warp import card_detector, perspective_corrector
 from .ocr.extract import CardInfo, ocr_extractor
-from .pricing.poketcg_prices import PriceData, pokemon_pricer
-from .resolve.poketcg import PokemonCard, pokemon_resolver
+from .pricing.poketcg_prices import PriceData, map_price_blocks
+from .resolve.poketcg import get_card, search_by_number_name
 from .store.cache import card_cache
 from .store.logger import card_data_logger
 from .store.writer import csv_writer
@@ -30,9 +30,9 @@ __all__ = [
     "perspective_corrector",
     "ocr_extractor",
     "CardInfo",
-    "pokemon_resolver",
-    "PokemonCard",
-    "pokemon_pricer",
+    "get_card",
+    "search_by_number_name",
+    "map_price_blocks",
     "PriceData",
     "card_cache",
     "csv_writer",

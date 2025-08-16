@@ -17,18 +17,21 @@ class TestCSVWriter:
     """Test CSV writing functionality."""
 
     @pytest.fixture
-    def writer(self, tmp_path):
+    def temp_output_dir(self):
+        """Create a temporary output directory for each test."""
+        temp_dir = tempfile.mkdtemp()
+        output_dir = Path(temp_dir) / "output"
+        output_dir.mkdir()
+        
+        yield output_dir
+        
+        # Cleanup
+        shutil.rmtree(temp_dir)
+
+    @pytest.fixture
+    def writer(self, temp_output_dir):
         """Create CSV writer instance with isolated temp directory."""
-        # Temporarily change to tmp_path for testing
-        original_cwd = Path.cwd()
-        os.chdir(tmp_path)
-
-        writer = CSVWriter()
-
-        # Restore original directory after test
-        yield writer
-
-        os.chdir(original_cwd)
+        return CSVWriter(output_dir=temp_output_dir)
 
     def test_csv_initialization(self, writer):
         """Test that CSV writer is properly initialized."""

@@ -200,9 +200,14 @@ class PerspectiveCorrector:
         self,
         image: np.ndarray,
         card_contour: CardContour,
-        out_w: int = 900,
-        out_h: int = 1260,
+        out_w: int = None,
+        out_h: int = None,
     ) -> Optional[np.ndarray]:
+        # Use constants from constants.py for default dimensions
+        if out_w is None or out_h is None:
+            from ..core.constants import WARP_W, WARP_H
+            out_w = out_w or WARP_W
+            out_h = out_h or WARP_H
         """Warp card to rectangular shape."""
         try:
             # Order corners: top-left, top-right, bottom-right, bottom-left

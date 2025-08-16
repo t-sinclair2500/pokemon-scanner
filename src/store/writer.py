@@ -32,11 +32,15 @@ class CSVWriter:
         "price_sources",
     ]
 
-    def __init__(self):
+    def __init__(self, output_dir: Optional[Path] = None):
         self.logger = get_logger(__name__)
-        # Resolve output directory relative to project root
-        project_root = Path(__file__).parent.parent.parent
-        self.output_dir = project_root / "output"
+        # Use provided output_dir or resolve relative to project root
+        if output_dir is not None:
+            self.output_dir = output_dir
+        else:
+            project_root = Path(__file__).parent.parent.parent
+            self.output_dir = project_root / "output"
+        
         self.output_dir.mkdir(exist_ok=True)
 
         # Main CSV file for card data
@@ -83,9 +87,18 @@ class CSVWriter:
         self.logger.debug("Row written to CSV", row_dict=row_dict)
 
     def _extract_card_data(self, pokemon_card) -> Dict[str, Any]:
-        """Extract card data from either a dict or PokemonCard object."""
-        if hasattr(pokemon_card, "id"):
-            # PokemonCard object
+        """Extract card data from either a dict or ResolvedCard object."""
+        if hasattr(pokemon_card, "card_id"):
+            # ResolvedCard object
+            return {
+                "id": pokemon_card.card_id,
+                "name": pokemon_card.name,
+                "number": pokemon_card.number,
+                "set": {"name": pokemon_card.set_name, "id": pokemon_card.set_id},
+                "rarity": pokemon_card.rarity,
+            }
+        elif hasattr(pokemon_card, "id"):
+            # PokemonCard object (legacy)
             return {
                 "id": pokemon_card.id,
                 "name": pokemon_card.name,

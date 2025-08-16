@@ -1,0 +1,24 @@
+You are my senior Python pair programmer.
+Use THINK → PLAN → APPLY → TEST and log to TASKLOG.md.
+
+GOAL
+Implement comprehensive error handling and logging throughout the Pokemon scanner application to ensure robust operation and debugging capabilities.
+
+THINK
+The application needs systematic error handling for network failures, OCR failures, file I/O errors, and configuration issues. Logging should provide structured information for debugging and monitoring.
+
+PLAN
+- `src/utils/error_handler.py`: Centralized error handling with custom exception classes
+- `src/utils/retry.py`: Retry decorator with exponential backoff for transient failures
+- `src/utils/validation.py`: Input validation and sanitization utilities
+- Update existing modules to use structured error handling and logging
+- Add error handling tests to verify graceful degradation
+
+APPLY
+Implement error handling utilities and integrate them throughout the codebase.
+
+TEST
+- All error handling tests pass
+- Logging provides structured debug information
+- Application gracefully handles failures without crashing
+

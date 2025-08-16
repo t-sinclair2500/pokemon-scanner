@@ -19,11 +19,13 @@ from .capture.warp import PerspectiveCorrector
 from .ocr.extract import ocr_extractor
 from .pricing.poketcg_prices import pokemon_pricer
 from .resolve.poketcg import PokemonTCGResolver
+from .reference.build_index import build_index, fetch_cards
 from .store.cache import card_cache
 from .store.writer import csv_writer
 from .utils.config import settings
 from .utils.log import configure_logging, get_logger
 from .ocr.extract import CardInfo
+from .core.constants import CONFIDENCE_REVIEW
 
 # Configure logging
 configure_logging()
@@ -37,6 +39,71 @@ app = typer.Typer(
     help="Pokemon Card Scanner - Focused on accurate scanning and logging",
     add_completion=False,
 )
+
+
+@app.command(name="build-index")
+def build_index_command(
+    index_dir: str = typer.Option(
+        "index", "--index-dir", "-i", help="Directory to store the reference index"
+    ),
+    api_key: Optional[str] = typer.Option(
+        None, "--api-key", "-k", help="Pokemon TCG API key (optional)"
+    ),
+):
+    """Build local visual search index from pokemontcg.io."""
+    
+    console.print(
+        Panel.fit(
+            "[bold blue]Pokemon Card Scanner - BUILD INDEX[/bold blue]\n"
+            "[dim]Building visual search index from Pokemon TCG API[/dim]",
+            border_style="blue",
+        )
+    )
+    
+    try:
+        index_path = Path(index_dir)
+        index_path.mkdir(parents=True, exist_ok=True)
+        
+        with console.status("[bold green]Building reference index...", spinner="dots"):
+            # Fetch cards from API
+            console.print("[green]✓ Fetching cards from Pokemon TCG API...[/green]")
+            cards = asyncio.run(fetch_cards(api_key))
+            console.print(f"[green]✓ Fetched {len(cards)} cards[/green]")
+            
+            # Build the index
+            console.print("[green]✓ Building visual search index...[/green]")
+            build_index(cards, index_path)
+            console.print("[green]✓ Index built successfully![/green]")
+            
+        # Show summary
+        _show_build_index_summary(index_path, len(cards))
+        
+    except Exception as e:
+        console.print(f"\n[red]❌ Error building index: {e}[/red]")
+        logger.error("Index building error", error=str(e))
+        raise typer.Exit(1)
+
+
+def _show_build_index_summary(index_path: Path, card_count: int) -> None:
+    """Show the build index summary."""
+    console.print("\n[bold]Index Building Complete[/bold]")
+    console.print(f"Total cards indexed: {card_count}")
+    console.print(f"Index directory: {index_path.absolute()}")
+    
+    # Check what was created
+    if index_path.exists():
+        hnsw_file = index_path / "hnsw.bin"
+        meta_file = index_path / "meta.parquet"
+        images_dir = index_path / "images"
+        
+        console.print("\n[bold]Generated Files:[/bold]")
+        console.print(f"Vector index: {'✓' if hnsw_file.exists() else '✗'} hnsw.bin")
+        console.print(f"Metadata: {'✓' if meta_file.exists() else '✗'} meta.parquet")
+        console.print(f"Images: {'✓' if images_dir.exists() else '✗'} {images_dir.name}/")
+        
+        if images_dir.exists():
+            image_count = len(list(images_dir.glob("*.jpg")))
+            console.print(f"Image count: {image_count}")
 
 
 @app.command()
@@ -215,15 +282,39 @@ async def _process_run_card(
 
         # Extract card info
         card_info, processing_time = _extract_run_card_info(progress, task, warped_image)
-        if card_info is None or card_info.confidence < confidence_threshold:
-            if card_info and card_info.confidence < confidence_threshold:
+        if card_info is None:
+            return False
+            
+        # Check if confidence is below review threshold and try resolver fallback
+        fallback_card = None
+        if card_info.confidence < confidence_threshold:
+            if card_info.confidence < CONFIDENCE_REVIEW:
+                console.print(
+                    f"[yellow]⚠ Low confidence ({card_info.confidence:.1f}%) - attempting resolver fallback...[/yellow]"
+                )
+                # Try resolver fallback with collector number
+                if card_info.collector_number and card_info.name:
+                    fallback_card = await _try_resolver_fallback(
+                        card_info.collector_number, card_info.name, resolver
+                    )
+                    if fallback_card:
+                        console.print("[green]✓ Resolver fallback successful![/green]")
+                        # Update card_info with resolved data for consistent processing
+                        card_info.confidence = 0.75  # Set to acceptable level after fallback
+                    else:
+                        console.print("[yellow]⚠ Resolver fallback failed - consider rescanning[/yellow]")
+                        return False
+                else:
+                    console.print("[yellow]⚠ No collector number found for fallback - consider rescanning[/yellow]")
+                    return False
+            else:
                 console.print(
                     f"[yellow]⚠ Low confidence ({card_info.confidence:.1f}%) - consider rescanning[/yellow]"
                 )
-            return False
+                return False
 
         # Resolve and price card
-        best_card, price_data = await _resolve_and_price_run_card(progress, task, card_info, resolver)
+        best_card, price_data = await _resolve_and_price_run_card(progress, task, card_info, resolver, fallback_card)
         if best_card is None and price_data is None:
             return False
 
@@ -278,9 +369,22 @@ def _extract_run_card_info(progress, task, warped_image: np.ndarray) -> Tuple[Op
 
 
 async def _resolve_and_price_run_card(progress, task, card_info: CardInfo,
-                                      resolver: PokemonTCGResolver) -> Tuple[Optional[Dict], Optional[Dict]]:
+                                      resolver: PokemonTCGResolver, fallback_card: Optional[Dict] = None) -> Tuple[Optional[Dict], Optional[Dict]]:
     """Resolve and price a card in run mode."""
     progress.update(task, description="Resolving card data...")
+
+    # If we have a fallback card from low confidence, use it directly
+    if fallback_card:
+        console.print("[green]✓ Using fallback card data[/green]")
+        # Extract pricing from fallback card
+        price_data = pokemon_pricer.extract_prices_from_card(fallback_card)
+        
+        # Cache the results
+        card_cache.upsert_card(fallback_card)
+        if price_data:
+            card_cache.upsert_prices(fallback_card["id"], price_data)
+        
+        return fallback_card, price_data
 
     # Check cache first
     cache_key = _build_run_cache_key(card_info)
@@ -342,6 +446,41 @@ async def _resolve_run_card(card_info: CardInfo, resolver: PokemonTCGResolver) -
     # Extract pricing
     price_data = pokemon_pricer.extract_prices_from_card(best_card)
     return best_card, price_data
+
+
+async def _try_resolver_fallback(collector_number: Dict[str, int], name: str, resolver: PokemonTCGResolver) -> Optional[Dict]:
+    """Try resolver fallback when visual confidence is low."""
+    try:
+        # Format collector number as string
+        number_str = f"{collector_number['num']}/{collector_number['den']}"
+        
+        # Use resolver search_by_number_name for fallback
+        from .resolve.poketcg import search_by_number_name
+        fallback_card = await search_by_number_name(
+            number=number_str,
+            name=name,
+            api_key=resolver.api_key
+        )
+        
+        if fallback_card:
+            # Convert ResolvedCard to dict format for consistency
+            return {
+                "id": fallback_card.card_id,
+                "name": fallback_card.name,
+                "number": fallback_card.number,
+                "set": {"name": fallback_card.set_name, "id": fallback_card.set_id},
+                "rarity": fallback_card.rarity,
+                "images": fallback_card.images,
+                "tcgplayer": fallback_card.raw_tcgplayer,
+                "cardmarket": fallback_card.raw_cardmarket,
+            }
+        
+        return None
+        
+    except Exception as e:
+        console.print(f"[red]❌ Resolver fallback error: {e}[/red]")
+        logger.error("Resolver fallback error", error=str(e))
+        return None
 
 
 def _write_run_csv_and_save_image(progress, task, card_count: int, card_info: CardInfo,

@@ -9,8 +9,10 @@ import cv2
 import numpy as np
 import pytesseract
 
+from ..core.constants import ROI_NAME, ROI_NUMBER
 from ..utils.config import ensure_tesseract, settings
 from ..utils.log import LoggerMixin
+from .regexes import COLLECTOR_NUMBER_PATTERN
 
 
 @dataclass
@@ -48,8 +50,8 @@ class OCRExtractor(LoggerMixin):
         pytesseract.pytesseract.tesseract_cmd = self.tesseract_path
         self.confidence_threshold = settings.OCR_CONFIDENCE_THRESHOLD
 
-        # Collector number regex pattern
-        self.number_pattern = re.compile(r"\b([1-9]\d{0,2})\s*/\s*([1-9]\d{0,2})\b")
+        # Use imported regex pattern for consistency
+        self.number_pattern = COLLECTOR_NUMBER_PATTERN
 
         self.logger.info(
             "OCR extractor initialized",
@@ -68,8 +70,8 @@ class OCRExtractor(LoggerMixin):
             height, width = warped_image.shape[:2]
 
             # Define ROI for name: TOP (y 5-14% height, x 8-92% width)
-            y1, y2 = int(height * 0.05), int(height * 0.14)
-            x1, x2 = int(width * 0.08), int(width * 0.92)
+            y1, y2 = int(height * ROI_NAME[0]), int(height * ROI_NAME[1])
+            x1, x2 = int(width * ROI_NAME[2]), int(width * ROI_NAME[3])
 
             # Extract ROI
             name_roi = warped_image[y1:y2, x1:x2]
@@ -112,8 +114,8 @@ class OCRExtractor(LoggerMixin):
             height, width = warped_image.shape[:2]
 
             # Define ROI for collector number: BOTTOM (y 88-98% height, x 5-95% width)
-            y1, y2 = int(height * 0.88), int(height * 0.98)
-            x1, x2 = int(width * 0.05), int(width * 0.95)
+            y1, y2 = int(height * ROI_NUMBER[0]), int(height * ROI_NUMBER[1])
+            x1, x2 = int(width * ROI_NUMBER[2]), int(width * ROI_NUMBER[3])
 
             # Extract ROI
             number_roi = warped_image[y1:y2, x1:x2]

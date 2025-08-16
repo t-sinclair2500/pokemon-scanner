@@ -2,20 +2,26 @@
 
 import pytest
 
-from src.pricing.poketcg_prices import PokemonTCGPricer, PriceData
-from src.resolve.poketcg import PokemonCard
+from src.core.types import PriceData
 
 
 class TestPriceData:
     """Test PriceData dataclass."""
 
     def test_price_data_default_initialization(self):
-        """Test PriceData with default values."""
-        price_data = PriceData()
+        """Test PriceData with required values."""
+        price_data = PriceData(
+            tcgplayer_market_usd=None,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=["pokemontcg.io"]
+        )
 
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
+        assert price_data.tcgplayer_market_usd is None
+        assert price_data.cardmarket_trend_eur is None
+        assert price_data.cardmarket_avg30_eur is None
         assert price_data.pricing_updatedAt_tcgplayer == ""
         assert price_data.pricing_updatedAt_cardmarket == ""
         assert price_data.price_sources == ["pokemontcg.io"]
@@ -39,230 +45,123 @@ class TestPriceData:
         assert price_data.price_sources == ["pokemontcg.io", "manual"]
 
     def test_price_data_price_sources_default(self):
-        """Test price_sources defaults to pokemontcg.io when None."""
-        price_data = PriceData(price_sources=None)
+        """Test price_sources can be set to pokemontcg.io."""
+        price_data = PriceData(
+            tcgplayer_market_usd=None,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=["pokemontcg.io"]
+        )
         assert price_data.price_sources == ["pokemontcg.io"]
 
 
-class TestPokemonTCGPricer:
-    """Test Pokemon TCG pricing extraction."""
+class TestMapPriceBlocks:
+    """Test the new map_price_blocks function."""
 
-    @pytest.fixture
-    def pricer(self):
-        """Create pricer instance."""
-        return PokemonTCGPricer()
-
-    def test_extract_prices_holofoil_priority(self, pricer):
-        """Test extracting holofoil market price with fallback order."""
-        card = PokemonCard(
-            id="base1-4",
-            name="Charizard",
-            number="4",
-            set_name="Base",
-            set_id="base1",
-            rarity="Rare Holo",
-            images={},
-            tcgplayer={
+    def test_map_price_blocks_with_tcgplayer_prices(self):
+        """Test mapping TCGPlayer prices with fallback order."""
+        from src.pricing.poketcg_prices import map_price_blocks
+        
+        card_json = {
+            "tcgplayer": {
                 "updatedAt": "2023/12/01",
-                "prices": {"holofoil": {"market": 125.00}},
-            },
-            cardmarket={
-                "updatedAt": "2023/12/01",
-                "prices": {"trendPrice": 120.00, "avg30": 118.75},
-            },
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-
-        assert price_data.tcgplayer_market_usd == "125.00"
-        assert price_data.cardmarket_trend_eur == "120.00"
-        assert price_data.cardmarket_avg30_eur == "118.75"
-        assert price_data.pricing_updatedAt_tcgplayer == "2023/12/01"
-        assert price_data.pricing_updatedAt_cardmarket == "2023/12/01"
-        assert price_data.price_sources == ["pokemontcg.io"]
-
-    def test_extract_prices_normal_priority(self, pricer):
-        """Test normal market price takes priority over holofoil."""
-        card = PokemonCard(
-            id="test-1",
-            name="Test",
-            number="1",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={
-                "prices": {"normal": {"market": 10.00}, "holofoil": {"market": 20.00}}
-            },
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert price_data.tcgplayer_market_usd == "10.00"
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
-
-    def test_extract_prices_reverse_holofoil_fallback(self, pricer):
-        """Test reverse holofoil fallback when normal and holofoil missing."""
-        card = PokemonCard(
-            id="test-2",
-            name="Test",
-            number="2",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={"prices": {"reverseHolofoil": {"market": 15.00}}},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert price_data.tcgplayer_market_usd == "15.00"
-
-    def test_extract_prices_no_pricing(self, pricer):
-        """Test card with no valid pricing returns empty PriceData."""
-        card = PokemonCard(
-            id="test-3",
-            name="Test",
-            number="3",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert isinstance(price_data, PriceData)
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
-        assert price_data.pricing_updatedAt_tcgplayer == ""
-        assert price_data.pricing_updatedAt_cardmarket == ""
-
-    def test_extract_prices_partial_tcgplayer(self, pricer):
-        """Test partial TCGPlayer data extraction."""
-        card = PokemonCard(
-            id="test-4",
-            name="Test",
-            number="4",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={"prices": {"normal": {"market": 25.00}}},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert price_data.tcgplayer_market_usd == "25.00"
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
-
-    def test_extract_prices_partial_cardmarket(self, pricer):
-        """Test partial CardMarket data extraction."""
-        card = PokemonCard(
-            id="test-5",
-            name="Test",
-            number="5",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            cardmarket={"prices": {"trendPrice": 30.00}},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == "30.00"
-        assert price_data.cardmarket_avg30_eur == ""
-
-    def test_extract_prices_malformed_data(self, pricer):
-        """Test handling of malformed pricing data."""
-        card = PokemonCard(
-            id="test-6",
-            name="Test",
-            number="6",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={
                 "prices": {
-                    "normal": {"market": None},
-                    "holofoil": {"market": "invalid_price"},
+                    "normal": {"market": 10.00},
+                    "holofoil": {"market": 20.00},
+                    "reverseHolofoil": {"market": 15.00}
                 }
             },
-            cardmarket={"prices": {"trendPrice": None, "avg30": "not_a_number"}},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert isinstance(price_data, PriceData)
-        # Should handle None values gracefully
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
-
-    def test_extract_prices_empty_prices_dict(self, pricer):
-        """Test handling of empty prices dictionary."""
-        card = PokemonCard(
-            id="test-7",
-            name="Test",
-            number="7",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={"prices": {}},
-            cardmarket={"prices": {}},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert isinstance(price_data, PriceData)
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
-
-    def test_extract_prices_missing_prices_key(self, pricer):
-        """Test handling of missing 'prices' key."""
-        card = PokemonCard(
-            id="test-8",
-            name="Test",
-            number="8",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={"updatedAt": "2023/12/01"},
-            cardmarket={"updatedAt": "2023/12/01"},
-        )
-
-        price_data = pricer.extract_prices_from_card(card)
-        assert isinstance(price_data, PriceData)
-        assert price_data.tcgplayer_market_usd == ""
-        assert price_data.cardmarket_trend_eur == ""
-        assert price_data.cardmarket_avg30_eur == ""
+            "cardmarket": {
+                "updatedAt": "2023/12/01",
+                "prices": {
+                    "trendPrice": 12.50,
+                    "avg30": 11.75
+                }
+            }
+        }
+        
+        price_data = map_price_blocks(card_json)
+        
+        # Should pick normal first (10.00) over holofoil (20.00) and reverseHolofoil (15.00)
+        assert price_data.tcgplayer_market_usd == 10.00
+        assert price_data.cardmarket_trend_eur == 12.50
+        assert price_data.cardmarket_avg30_eur == 11.75
         assert price_data.pricing_updatedAt_tcgplayer == "2023/12/01"
         assert price_data.pricing_updatedAt_cardmarket == "2023/12/01"
+        assert price_data.price_sources == ["pokemontcg.io"]
 
-    def test_extract_prices_numeric_strings(self, pricer):
-        """Test that numeric values are converted to strings."""
-        card = PokemonCard(
-            id="test-9",
-            name="Test",
-            number="9",
-            set_name="Test",
-            set_id="test",
-            rarity="Common",
-            images={},
-            tcgplayer={"prices": {"normal": {"market": 42.50}}},
-            cardmarket={"prices": {"trendPrice": 40.00, "avg30": 38.75}},
-        )
+    def test_map_price_blocks_fallback_to_holofoil(self):
+        """Test fallback to holofoil when normal price is missing."""
+        from src.pricing.poketcg_prices import map_price_blocks
+        
+        card_json = {
+            "tcgplayer": {
+                "updatedAt": "2023/12/01",
+                "prices": {
+                    "holofoil": {"market": 25.00},
+                    "reverseHolofoil": {"market": 18.00}
+                }
+            },
+            "cardmarket": {
+                "updatedAt": "2023/12/01",
+                "prices": {
+                    "trendPrice": 22.50,
+                    "avg30": 21.00
+                }
+            }
+        }
+        
+        price_data = map_price_blocks(card_json)
+        
+        # Should pick holofoil (25.00) since normal is missing
+        assert price_data.tcgplayer_market_usd == 25.00
+        assert price_data.cardmarket_trend_eur == 22.50
+        assert price_data.cardmarket_avg30_eur == 21.00
 
-        price_data = pricer.extract_prices_from_card(card)
-        assert price_data.tcgplayer_market_usd == "42.50"
-        assert price_data.cardmarket_trend_eur == "40.00"
-        assert price_data.cardmarket_avg30_eur == "38.75"
-        # Verify they are strings, not numbers
-        assert isinstance(price_data.tcgplayer_market_usd, str)
-        assert isinstance(price_data.cardmarket_trend_eur, str)
-        assert isinstance(price_data.cardmarket_avg30_eur, str)
+    def test_map_price_blocks_no_tcgplayer_prices(self):
+        """Test handling when TCGPlayer has no market prices."""
+        from src.pricing.poketcg_prices import map_price_blocks
+        
+        card_json = {
+            "tcgplayer": {
+                "updatedAt": "2023/12/01",
+                "prices": {
+                    "normal": {"low": 5.00, "mid": 7.50, "high": 10.00}
+                }
+            },
+            "cardmarket": {
+                "updatedAt": "2023/12/01",
+                "prices": {
+                    "trendPrice": 6.50,
+                    "avg30": 6.00
+                }
+            }
+        }
+        
+        price_data = map_price_blocks(card_json)
+        
+        # Should be None since no market prices exist
+        assert price_data.tcgplayer_market_usd is None
+        assert price_data.cardmarket_trend_eur == 6.50
+        assert price_data.cardmarket_avg30_eur == 6.00
+
+    def test_map_price_blocks_empty_data(self):
+        """Test handling of empty or missing data."""
+        from src.pricing.poketcg_prices import map_price_blocks
+        
+        card_json = {}
+        
+        price_data = map_price_blocks(card_json)
+        
+        # All fields should be None or empty
+        assert price_data.tcgplayer_market_usd is None
+        assert price_data.cardmarket_trend_eur is None
+        assert price_data.cardmarket_avg30_eur is None
+        assert price_data.pricing_updatedAt_tcgplayer == ""
+        assert price_data.pricing_updatedAt_cardmarket == ""
+        assert price_data.price_sources == ["pokemontcg.io"]
 
 
 if __name__ == "__main__":

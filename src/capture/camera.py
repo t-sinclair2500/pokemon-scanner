@@ -223,9 +223,10 @@ class CameraCapture(LoggerMixin):
             # Sort corners: top-left, top-right, bottom-right, bottom-left
             corners = self._sort_corners(corners)
 
-            # Define target dimensions (standard card aspect ratio ~1.4:1)
-            target_width = 900
-            target_height = int(target_width * 1.4)  # ~1260
+            # Use constants from constants.py for target dimensions
+            from ..core.constants import WARP_W, WARP_H
+            target_width = WARP_W
+            target_height = WARP_H
 
             # Define target corners
             target_corners = np.array(

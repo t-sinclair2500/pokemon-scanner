@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from src.pricing.poketcg_prices import PriceData
-from src.resolve.poketcg import PokemonCard
+from src.core.types import ResolvedCard
 from src.store.cache import CacheManager
 
 
@@ -34,23 +34,25 @@ class TestCacheManager:
     @pytest.fixture
     def sample_card(self):
         """Create a sample Pokemon card."""
-        return PokemonCard(
-            id="base1-4",
+        return ResolvedCard(
+            card_id="base1-4",
             name="Charizard",
             number="4",
             set_name="Base",
             set_id="base1",
             rarity="Rare Holo",
             images={},
+            raw_tcgplayer={},
+            raw_cardmarket={}
         )
 
     @pytest.fixture
     def sample_price_data(self):
         """Create sample price data."""
         return PriceData(
-            tcgplayer_market_usd="125.00",
-            cardmarket_trend_eur="120.00",
-            cardmarket_avg30_eur="118.75",
+            tcgplayer_market_usd=125.00,
+            cardmarket_trend_eur=120.00,
+            cardmarket_avg30_eur=118.75,
             pricing_updatedAt_tcgplayer="2023/12/01",
             pricing_updatedAt_cardmarket="2023/12/01",
             price_sources=["pokemontcg.io"],
@@ -59,21 +61,30 @@ class TestCacheManager:
     def test_database_initialization(self, cache_manager):
         """Test database tables are created correctly."""
         # Check that tables exist by trying to insert data
-        card = PokemonCard(
-            id="test-1",
+        card = ResolvedCard(
+            card_id="test-1",
             name="Test",
             number="1",
             set_name="Test",
             set_id="test",
             rarity="Common",
             images={},
+            raw_tcgplayer={},
+            raw_cardmarket={}
         )
 
         # Should not raise an error
         cache_manager.upsert_card(card)
 
         # Verify the card was inserted
-        price_data = PriceData()
+        price_data = PriceData(
+            tcgplayer_market_usd=None,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=[]
+        )
         cache_manager.upsert_prices("test-1", price_data)
 
         # Should not raise an error
@@ -86,8 +97,15 @@ class TestCacheManager:
 
         # Verify card exists by checking if we can get prices
         # (prices table has foreign key to cards table)
-        price_data = PriceData()
-        cache_manager.upsert_prices(sample_card.id, price_data)
+        price_data = PriceData(
+            tcgplayer_market_usd=None,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=[]
+        )
+        cache_manager.upsert_prices(sample_card.card_id, price_data)
 
         # Should not raise an error, indicating card exists
         assert True
@@ -98,11 +116,11 @@ class TestCacheManager:
         cache_manager.upsert_card(sample_card)
 
         # Insert prices
-        cache_manager.upsert_prices(sample_card.id, sample_price_data)
+        cache_manager.upsert_prices(sample_card.card_id, sample_price_data)
 
         # Retrieve prices from cache
         cached_prices = cache_manager.get_price_data_from_cache(
-            sample_card.id, max_age_hours=24
+            sample_card.card_id, max_age_hours=24
         )
 
         assert cached_prices is not None
@@ -119,11 +137,11 @@ class TestCacheManager:
         """Test cache hit when data is within cache window."""
         # Insert card and prices
         cache_manager.upsert_card(sample_card)
-        cache_manager.upsert_prices(sample_card.id, sample_price_data)
+        cache_manager.upsert_prices(sample_card.card_id, sample_price_data)
 
         # Retrieve prices within cache window
         cached_prices = cache_manager.get_price_data_from_cache(
-            sample_card.id, max_age_hours=24
+            sample_card.card_id, max_age_hours=24
         )
 
         assert cached_prices is not None
@@ -135,11 +153,11 @@ class TestCacheManager:
         """Test cache miss when data is expired."""
         # Insert card and prices
         cache_manager.upsert_card(sample_card)
-        cache_manager.upsert_prices(sample_card.id, sample_price_data)
+        cache_manager.upsert_prices(sample_card.card_id, sample_price_data)
 
         # Retrieve prices with very short cache window (should miss)
         cached_prices = cache_manager.get_price_data_from_cache(
-            sample_card.id, max_age_hours=0
+            sample_card.card_id, max_age_hours=0
         )
 
         assert cached_prices is None
@@ -216,11 +234,11 @@ class TestCacheManager:
 
         # Insert card and prices
         cache_manager.upsert_card(sample_card)
-        cache_manager.upsert_prices(sample_card.id, price_data)
+        cache_manager.upsert_prices(sample_card.card_id, price_data)
 
         # Retrieve from cache
         cached_prices = cache_manager.get_price_data_from_cache(
-            sample_card.id, max_age_hours=24
+            sample_card.card_id, max_age_hours=24
         )
 
         assert cached_prices is not None
@@ -233,40 +251,57 @@ class TestCacheManager:
     def test_empty_price_data_handling(self, cache_manager, sample_card):
         """Test handling of empty price data."""
         # Create empty price data
-        empty_price_data = PriceData()
+        empty_price_data = PriceData(
+            tcgplayer_market_usd=None,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=[]
+        )
 
         # Insert card and empty prices
         cache_manager.upsert_card(sample_card)
-        cache_manager.upsert_prices(sample_card.id, empty_price_data)
+        cache_manager.upsert_prices(sample_card.card_id, empty_price_data)
 
         # Retrieve from cache
         cached_prices = cache_manager.get_price_data_from_cache(
-            sample_card.id, max_age_hours=24
+            sample_card.card_id, max_age_hours=24
         )
 
         assert cached_prices is not None
         assert cached_prices.tcgplayer_market_usd == ""
         assert cached_prices.cardmarket_trend_eur == ""
         assert cached_prices.cardmarket_avg30_eur == ""
-        assert cached_prices.price_sources == ["pokemontcg.io"]
+        assert cached_prices.price_sources == []  # Empty list should be returned as-is
 
     def test_multiple_price_sources(self, cache_manager, sample_card):
         """Test handling multiple price sources for the same card."""
         # Create price data with different sources
         price_data1 = PriceData(
-            tcgplayer_market_usd="100.00", price_sources=["source1"]
+            tcgplayer_market_usd=100.00,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=["source1"]
         )
 
         price_data2 = PriceData(
-            tcgplayer_market_usd="110.00", price_sources=["source2"]
+            tcgplayer_market_usd=110.00,
+            cardmarket_trend_eur=None,
+            cardmarket_avg30_eur=None,
+            pricing_updatedAt_tcgplayer="",
+            pricing_updatedAt_cardmarket="",
+            price_sources=["source2"]
         )
 
         # Insert card
         cache_manager.upsert_card(sample_card)
 
         # Insert prices from different sources
-        cache_manager.upsert_prices(sample_card.id, price_data1, "source1")
-        cache_manager.upsert_prices(sample_card.id, price_data2, "source2")
+        cache_manager.upsert_prices(sample_card.card_id, price_data1, "source1")
+        cache_manager.upsert_prices(sample_card.card_id, price_data2, "source2")
 
         # Both should be retrievable (though get_price_data_from_cache only gets one)
         # This tests that the composite primary key works correctly

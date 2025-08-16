@@ -5,7 +5,7 @@ GOAL
 Add small, deterministic tests for pricing flattening, writer header order, resolver backoff, and OCR number parsing.
 
 THINK
-We don’t need full integration tests; just key units that prevent regressions.
+We don't need full integration tests; just key units that prevent regressions.
 
 PLAN
 - `tests/test_pricing.py`: verify fallback order (normal → holofoil → reverse) and missing fields.
@@ -18,3 +18,4 @@ Implement tests using pytest and simple fixtures.
 
 TEST
 - `pytest -q` passes.
+

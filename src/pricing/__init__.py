@@ -1,5 +1,5 @@
 """Pricing package for Pokemon card market prices."""
 
-from .poketcg_prices import PriceData, pokemon_pricer
+from .poketcg_prices import PriceData, map_price_blocks
 
-__all__ = ["PriceData", "pokemon_pricer"]
+__all__ = ["PriceData", "map_price_blocks"]

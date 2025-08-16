@@ -81,17 +81,20 @@ class CameraOverlay(LoggerMixin):
         else:
             color = OverlayColor.CARD_ERROR.value
 
-        # TOP name band: y 5-14% height, x 8-92%
-        top_y_start = int(height * 0.05)
-        top_y_end = int(height * 0.14)
-        top_x_start = int(width * 0.08)
-        top_x_end = int(width * 0.92)
+        # Use constants from constants.py for ROI positioning
+        from ..core.constants import ROI_NAME, ROI_NUMBER
+        
+        # TOP name band: ROI_NAME (y1,y2,x1,x2)
+        top_y_start = int(height * ROI_NAME[0])
+        top_y_end = int(height * ROI_NAME[1])
+        top_x_start = int(width * ROI_NAME[2])
+        top_x_end = int(width * ROI_NAME[3])
 
-        # BOTTOM collector band: y 88-98% height, x 5-95%
-        bottom_y_start = int(height * 0.88)
-        bottom_y_end = int(height * 0.98)
-        bottom_x_start = int(width * 0.05)
-        bottom_x_end = int(width * 0.95)
+        # BOTTOM collector band: ROI_NUMBER (y1,y2,x1,x2)
+        bottom_y_start = int(height * ROI_NUMBER[0])
+        bottom_y_end = int(height * ROI_NUMBER[1])
+        bottom_x_start = int(width * ROI_NUMBER[2])
+        bottom_x_end = int(width * ROI_NUMBER[3])
 
         # Draw translucent rectangles
         overlay = overlay_frame.copy()

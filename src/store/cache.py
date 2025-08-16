@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..pricing.poketcg_prices import PriceData
-from ..resolve.poketcg import PokemonCard
+from ..core.types import ResolvedCard
 from ..utils.config import ensure_cache_dir, settings
 from ..utils.log import get_logger
 
@@ -156,7 +156,7 @@ class CacheManager:
             )
             return None
 
-    def upsert_card(self, card: PokemonCard) -> None:
+    def upsert_card(self, card: ResolvedCard) -> None:
         """Insert or update cards table."""
         try:
             now = datetime.now().isoformat()
@@ -169,7 +169,7 @@ class CacheManager:
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
-                        card.id,
+                        card.card_id,
                         card.name,
                         card.set_id,
                         card.set_name,
@@ -180,10 +180,10 @@ class CacheManager:
                 )
                 conn.commit()
 
-                self.logger.debug("Card upserted", card_id=card.id, name=card.name)
+                self.logger.debug("Card upserted", card_id=card.card_id, name=card.name)
 
         except Exception as e:
-            self.logger.error("Error upserting card", card_id=card.id, error=str(e))
+            self.logger.error("Error upserting card", card_id=card.card_id, error=str(e))
             raise
 
     def upsert_prices(
